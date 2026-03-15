@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
 import Index from "./pages/Index.tsx";
 import AppScreen from "./pages/AppScreen.tsx";
+import GraphQLSecurityDocs from "./pages/GraphQLSecurityDocs.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/app" element={<AppScreen />} />
+            <Route path="/docs/graphql-security" element={<GraphQLSecurityDocs />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
