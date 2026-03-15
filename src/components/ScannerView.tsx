@@ -81,13 +81,18 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
     if (!file) return;
     setIsScanning(true);
     toast.info("Analyzing image...");
-    const results = await runInference();
-    setDetections(results);
-    setIsScanning(false);
-    toast.success(`Found ${results.length} item${results.length > 1 ? "s" : ""}`);
-    setTimeout(() => onDetection(results), 800);
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    try {
+      const results = await runInference();
+      setDetections(results);
+      toast.success(`Found ${results.length} item${results.length > 1 ? "s" : ""}`);
+      setTimeout(() => onDetection(results), 800);
+    } catch (err) {
+      console.error("Gallery inference error:", err);
+      toast.error("Failed to analyze image. Please try again.");
+    } finally {
+      setIsScanning(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleScan = async () => {
@@ -96,14 +101,19 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
     setDetections([]);
     setScanCount(prev => prev + 1);
 
-    const results = await runInference();
-    setDetections(results);
-    setShowPulse(true);
-    setTimeout(() => setShowPulse(false), 400);
-    setIsScanning(false);
-
-    toast.success(`Detected: ${results.map(r => r.displayName).join(", ")}`);
-    setTimeout(() => onDetection(results), 1200);
+    try {
+      const results = await runInference();
+      setDetections(results);
+      setShowPulse(true);
+      setTimeout(() => setShowPulse(false), 400);
+      toast.success(`Detected: ${results.map(r => r.displayName).join(", ")}`);
+      setTimeout(() => onDetection(results), 1200);
+    } catch (err) {
+      console.error("Scan inference error:", err);
+      toast.error("Scan failed. Please try again.");
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   return (

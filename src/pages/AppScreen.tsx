@@ -8,6 +8,7 @@ import ScannerView from "@/components/ScannerView";
 import ResultsView from "@/components/ResultsView";
 import ProfileView from "@/components/ProfileView";
 import OnboardingOverlay from "@/components/OnboardingOverlay";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import HistoryPage from "@/components/app-pages/HistoryPage";
 import ImpactPage from "@/components/app-pages/ImpactPage";
 import SettingsPage from "@/components/app-pages/SettingsPage";
@@ -173,40 +174,42 @@ const AppScreen = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col px-4 pb-20 overflow-hidden">
-        <AnimatePresence mode="wait">
-          {view === "scanner" && <ScannerView key="scanner" onDetection={handleDetection} />}
-          {view === "results" && (
-            <ResultsView key="results" detections={detections} onBack={() => setView("scanner")} />
-          )}
-          {view === "profile" && <ProfileView key="profile" onBack={() => setView("scanner")} />}
-          {view === "history" && (
-            <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-              <HistoryPage />
-            </motion.div>
-          )}
-          {view === "impact" && (
-            <motion.div key="impact" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-              <ImpactPage />
-            </motion.div>
-          )}
-          {view === "settings" && (
-            <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-              <SettingsPage />
-            </motion.div>
-          )}
-          {view === "help" && (
-            <motion.div key="help" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-              <HelpPage />
-            </motion.div>
-          )}
-          {view === "about" && (
-            <motion.div key="about" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-              <AboutPage />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      <ErrorBoundary fallbackMessage="This section encountered an error. Try navigating back or refreshing.">
+        <div className="flex-1 flex flex-col px-4 pb-20 overflow-hidden">
+          <AnimatePresence mode="wait">
+            {view === "scanner" && <ScannerView key="scanner" onDetection={handleDetection} />}
+            {view === "results" && (
+              <ResultsView key="results" detections={detections} onBack={() => setView("scanner")} />
+            )}
+            {view === "profile" && <ProfileView key="profile" onBack={() => setView("scanner")} />}
+            {view === "history" && (
+              <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <HistoryPage />
+              </motion.div>
+            )}
+            {view === "impact" && (
+              <motion.div key="impact" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <ImpactPage />
+              </motion.div>
+            )}
+            {view === "settings" && (
+              <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <SettingsPage />
+              </motion.div>
+            )}
+            {view === "help" && (
+              <motion.div key="help" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <HelpPage />
+              </motion.div>
+            )}
+            {view === "about" && (
+              <motion.div key="about" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <AboutPage />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </ErrorBoundary>
 
       {/* Bottom tab bar */}
       <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border px-6 py-3 flex items-center justify-around">
