@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Scan, User, Menu, X, Clock, Leaf, Settings, HelpCircle, Info,
-  Star, Flame,
+  Star, Flame, Brain, Users, Target,
 } from "lucide-react";
 import ScannerView from "@/components/ScannerView";
 import ResultsView from "@/components/ResultsView";
@@ -14,14 +14,20 @@ import ImpactPage from "@/components/app-pages/ImpactPage";
 import SettingsPage from "@/components/app-pages/SettingsPage";
 import HelpPage from "@/components/app-pages/HelpPage";
 import AboutPage from "@/components/app-pages/AboutPage";
+import QuizPage from "@/components/app-pages/QuizPage";
+import CommunityPage from "@/components/app-pages/CommunityPage";
+import ChallengesPage from "@/components/app-pages/ChallengesPage";
 import type { DetectedItem } from "@/context/UserContext";
 import { useUser } from "@/context/UserContext";
 
-type AppView = "scanner" | "results" | "profile" | "history" | "impact" | "settings" | "help" | "about";
+type AppView = "scanner" | "results" | "profile" | "history" | "impact" | "settings" | "help" | "about" | "quiz" | "community" | "challenges";
 
-const NAV_ITEMS: { id: AppView; icon: React.ElementType; label: string; group: "main" | "more" }[] = [
+const NAV_ITEMS: { id: AppView; icon: React.ElementType; label: string; group: "main" | "engage" | "more" }[] = [
   { id: "scanner", icon: Scan, label: "Scanner", group: "main" },
   { id: "profile", icon: User, label: "Profile", group: "main" },
+  { id: "challenges", icon: Target, label: "Challenges", group: "engage" },
+  { id: "quiz", icon: Brain, label: "Quiz", group: "engage" },
+  { id: "community", icon: Users, label: "Community", group: "engage" },
   { id: "history", icon: Clock, label: "History", group: "more" },
   { id: "impact", icon: Leaf, label: "Impact", group: "more" },
   { id: "settings", icon: Settings, label: "Settings", group: "more" },
