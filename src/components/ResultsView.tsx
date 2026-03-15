@@ -87,6 +87,19 @@ const ResultsView = ({ detections, onBack }: ResultsViewProps) => {
             <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-sm text-muted-foreground">Getting recycling rules...</p>
           </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-[250px]">{error}</p>
+            <button
+              onClick={onBack}
+              className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium active-press"
+            >
+              Go Back & Retry
+            </button>
+          </div>
         ) : (
           instructions.map((inst, i) => {
             const style = BIN_STYLES[inst.binColor] || BIN_STYLES.foreground;

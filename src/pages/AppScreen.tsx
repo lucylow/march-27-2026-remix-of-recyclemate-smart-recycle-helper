@@ -8,6 +8,7 @@ import ScannerView from "@/components/ScannerView";
 import ResultsView from "@/components/ResultsView";
 import ProfileView from "@/components/ProfileView";
 import OnboardingOverlay from "@/components/OnboardingOverlay";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import HistoryPage from "@/components/app-pages/HistoryPage";
 import ImpactPage from "@/components/app-pages/ImpactPage";
 import SettingsPage from "@/components/app-pages/SettingsPage";
