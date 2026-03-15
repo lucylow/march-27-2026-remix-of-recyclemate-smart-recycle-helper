@@ -94,6 +94,37 @@ const ImpactPage = () => {
     }));
   }, [scanHistory]);
 
+  // Material breakdown for pie chart
+  const MATERIAL_COLORS = [
+    "hsl(var(--primary))", "hsl(var(--success))", "hsl(32 95% 44%)",
+    "hsl(var(--destructive))", "hsl(270 60% 55%)", "hsl(190 80% 42%)",
+  ];
+
+  const LABEL_NAMES: Record<string, string> = {
+    plastic_bottle: "Plastic",
+    aluminum_can: "Aluminum",
+    cardboard: "Cardboard",
+    glass_bottle: "Glass",
+    newspaper: "Paper",
+    styrofoam: "Styrofoam",
+    battery: "Battery",
+    food_waste: "Organic",
+    electronic_waste: "E-Waste",
+  };
+
+  const materialData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    scanHistory.forEach((r) => {
+      r.items.forEach((item) => {
+        const name = LABEL_NAMES[item.label] || item.displayName;
+        counts[name] = (counts[name] || 0) + 1;
+      });
+    });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [scanHistory]);
+
   const stats = [
     { icon: <Recycle className="w-5 h-5" />, value: totalItems, label: "Items Recycled", color: "text-primary" },
     { icon: <Leaf className="w-5 h-5" />, value: `${co2Saved} kg`, label: "CO₂ Saved", color: "text-success" },
