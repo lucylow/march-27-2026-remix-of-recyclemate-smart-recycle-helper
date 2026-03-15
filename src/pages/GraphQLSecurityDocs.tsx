@@ -5,7 +5,6 @@ import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import js from "react-syntax-highlighter/dist/esm/languages/hljs/javascript";
 import python from "react-syntax-highlighter/dist/esm/languages/hljs/python";
 import bash from "react-syntax-highlighter/dist/esm/languages/hljs/bash";
-import bash from "react-syntax-highlighter/dist/esm/languages/hljs/bash";
 import sql from "react-syntax-highlighter/dist/esm/languages/hljs/sql";
 import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import {
