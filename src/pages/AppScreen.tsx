@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Scan, User, Menu, X, Clock, Leaf, Settings, HelpCircle, Info,
-  Star, Flame,
+  Star, Flame, Brain, Users, Target,
 } from "lucide-react";
 import ScannerView from "@/components/ScannerView";
 import ResultsView from "@/components/ResultsView";
@@ -14,14 +14,20 @@ import ImpactPage from "@/components/app-pages/ImpactPage";
 import SettingsPage from "@/components/app-pages/SettingsPage";
 import HelpPage from "@/components/app-pages/HelpPage";
 import AboutPage from "@/components/app-pages/AboutPage";
+import QuizPage from "@/components/app-pages/QuizPage";
+import CommunityPage from "@/components/app-pages/CommunityPage";
+import ChallengesPage from "@/components/app-pages/ChallengesPage";
 import type { DetectedItem } from "@/context/UserContext";
 import { useUser } from "@/context/UserContext";
 
-type AppView = "scanner" | "results" | "profile" | "history" | "impact" | "settings" | "help" | "about";
+type AppView = "scanner" | "results" | "profile" | "history" | "impact" | "settings" | "help" | "about" | "quiz" | "community" | "challenges";
 
-const NAV_ITEMS: { id: AppView; icon: React.ElementType; label: string; group: "main" | "more" }[] = [
+const NAV_ITEMS: { id: AppView; icon: React.ElementType; label: string; group: "main" | "engage" | "more" }[] = [
   { id: "scanner", icon: Scan, label: "Scanner", group: "main" },
   { id: "profile", icon: User, label: "Profile", group: "main" },
+  { id: "challenges", icon: Target, label: "Challenges", group: "engage" },
+  { id: "quiz", icon: Brain, label: "Quiz", group: "engage" },
+  { id: "community", icon: Users, label: "Community", group: "engage" },
   { id: "history", icon: Clock, label: "History", group: "more" },
   { id: "impact", icon: Leaf, label: "Impact", group: "more" },
   { id: "settings", icon: Settings, label: "Settings", group: "more" },
@@ -68,6 +74,7 @@ const AppScreen = () => {
   };
 
   const mainItems = NAV_ITEMS.filter((n) => n.group === "main");
+  const engageItems = NAV_ITEMS.filter((n) => n.group === "engage");
   const moreItems = NAV_ITEMS.filter((n) => n.group === "more");
 
   return (
@@ -125,6 +132,25 @@ const AppScreen = () => {
                 <p className="text-label text-muted-foreground px-3 mb-2">Main</p>
                 {mainItems.map((item) => {
                   const active = view === item.id || (view === "results" && item.id === "scanner");
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => navigateTo(item.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm mb-0.5 active-press transition-colors ${
+                        active ? "bg-primary/10 text-primary font-medium" : "text-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+
+                <div className="my-3 h-px bg-border" />
+
+                <p className="text-label text-muted-foreground px-3 mb-2">Engage</p>
+                {engageItems.map((item) => {
+                  const active = view === item.id;
                   return (
                     <button
                       key={item.id}
@@ -230,6 +256,21 @@ const AppScreen = () => {
             {view === "about" && (
               <motion.div key="about" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
                 <AboutPage />
+              </motion.div>
+            )}
+            {view === "quiz" && (
+              <motion.div key="quiz" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <QuizPage />
+              </motion.div>
+            )}
+            {view === "community" && (
+              <motion.div key="community" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <CommunityPage />
+              </motion.div>
+            )}
+            {view === "challenges" && (
+              <motion.div key="challenges" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <ChallengesPage />
               </motion.div>
             )}
           </AnimatePresence>
