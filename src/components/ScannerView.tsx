@@ -101,14 +101,19 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
     setDetections([]);
     setScanCount(prev => prev + 1);
 
-    const results = await runInference();
-    setDetections(results);
-    setShowPulse(true);
-    setTimeout(() => setShowPulse(false), 400);
-    setIsScanning(false);
-
-    toast.success(`Detected: ${results.map(r => r.displayName).join(", ")}`);
-    setTimeout(() => onDetection(results), 1200);
+    try {
+      const results = await runInference();
+      setDetections(results);
+      setShowPulse(true);
+      setTimeout(() => setShowPulse(false), 400);
+      toast.success(`Detected: ${results.map(r => r.displayName).join(", ")}`);
+      setTimeout(() => onDetection(results), 1200);
+    } catch (err) {
+      console.error("Scan inference error:", err);
+      toast.error("Scan failed. Please try again.");
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   return (

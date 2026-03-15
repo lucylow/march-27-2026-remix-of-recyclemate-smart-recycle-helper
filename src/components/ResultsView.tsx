@@ -23,14 +23,23 @@ const BIN_STYLES: Record<string, { bg: string; text: string; border: string }> =
 const ResultsView = ({ detections, onBack }: ResultsViewProps) => {
   const [instructions, setInstructions] = useState<DisposalInstruction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const { addPoints, incrementStreak, addScanRecord } = useUser();
 
   useEffect(() => {
     const fetchData = async () => {
-      const data = await getDisposalInstructions(detections);
-      setInstructions(data);
-      setLoading(false);
+      try {
+        setError(null);
+        const data = await getDisposalInstructions(detections);
+        setInstructions(data);
+      } catch (err) {
+        console.error("Failed to fetch disposal instructions:", err);
+        setError("Could not load recycling rules. Please try again.");
+        toast.error("Failed to load disposal instructions");
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [detections]);
