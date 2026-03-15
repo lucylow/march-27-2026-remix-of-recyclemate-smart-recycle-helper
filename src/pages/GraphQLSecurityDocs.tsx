@@ -27,7 +27,8 @@ import {
 
 SyntaxHighlighter.registerLanguage("javascript", js);
 SyntaxHighlighter.registerLanguage("python", python);
-SyntaxHighlighter.registerLanguage("graphql", graphql);
+SyntaxHighlighter.registerLanguage("graphql", js);
+SyntaxHighlighter.registerLanguage("bash", bash);
 SyntaxHighlighter.registerLanguage("bash", bash);
 SyntaxHighlighter.registerLanguage("sql", sql);
 
