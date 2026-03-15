@@ -34,7 +34,23 @@ const AppScreen = () => {
   const [detections, setDetections] = useState<DetectedItem[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { points, streak } = useUser();
+  const [seenAchievements, setSeenAchievements] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("recyclemate_seen_achievements") || "[]");
+    } catch { return []; }
+  });
+  const { points, streak, achievements } = useUser();
+
+  const unseenCount = achievements.filter(a => !seenAchievements.includes(a)).length;
+
+  const handleOpenDrawer = () => {
+    setDrawerOpen(true);
+    if (unseenCount > 0) {
+      const updated = [...new Set([...seenAchievements, ...achievements])];
+      setSeenAchievements(updated);
+      localStorage.setItem("recyclemate_seen_achievements", JSON.stringify(updated));
+    }
+  };
 
   useEffect(() => {
     const onboarded = localStorage.getItem("recyclemate_onboarded");
