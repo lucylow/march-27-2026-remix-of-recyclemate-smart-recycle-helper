@@ -223,6 +223,63 @@ const ImpactPage = () => {
         )}
       </motion.div>
 
+      {/* Material Breakdown Pie Chart */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="p-5 rounded-3xl border border-border bg-card shadow-soft"
+      >
+        <h3 className="text-sm font-semibold mb-1">Material Breakdown</h3>
+        <p className="text-xs text-muted-foreground mb-4">Items recycled by material type</p>
+        {hasData && materialData.length > 0 ? (
+          <div className="flex flex-col items-center">
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={materialData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={85}
+                  paddingAngle={3}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {materialData.map((_, idx) => (
+                    <Cell key={idx} fill={MATERIAL_COLORS[idx % MATERIAL_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value: number, name: string) => [`${value} item${value !== 1 ? "s" : ""}`, name]}
+                  contentStyle={{
+                    borderRadius: "12px",
+                    border: "1px solid hsl(var(--border))",
+                    fontSize: "12px",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-2">
+              {materialData.map((entry, idx) => (
+                <div key={entry.name} className="flex items-center gap-1.5">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: MATERIAL_COLORS[idx % MATERIAL_COLORS.length] }}
+                  />
+                  <span className="text-xs text-muted-foreground">{entry.name}</span>
+                  <span className="font-mono text-[10px] text-foreground font-medium">{entry.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-10 text-muted-foreground text-sm">
+            Start scanning to see material breakdown
+          </div>
+        )}
+      </motion.div>
+
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-4">
         {stats.map((stat, i) => (
