@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowLeft, Flame, Star, Clock, Trophy, Target } from "lucide-react";
 import { useUser } from "@/context/UserContext";
+import EcoAvatar from "@/components/EcoAvatar";
 
 interface ProfileViewProps {
   onBack: () => void;
