@@ -258,6 +258,21 @@ const AppScreen = () => {
                 <AboutPage />
               </motion.div>
             )}
+            {view === "quiz" && (
+              <motion.div key="quiz" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <QuizPage />
+              </motion.div>
+            )}
+            {view === "community" && (
+              <motion.div key="community" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <CommunityPage />
+              </motion.div>
+            )}
+            {view === "challenges" && (
+              <motion.div key="challenges" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
+                <ChallengesPage />
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </ErrorBoundary>
