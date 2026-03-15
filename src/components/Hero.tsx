@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import heroPhone from "@/assets/hero-phone.png";
 
 const Hero = () => {
