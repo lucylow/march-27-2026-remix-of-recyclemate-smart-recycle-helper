@@ -153,6 +153,27 @@ const AppScreen = () => {
 
                 <div className="my-3 h-px bg-border" />
 
+                <p className="text-label text-primary px-3 mb-2 flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3" /> AI-Powered
+                </p>
+                {aiItems.map((item) => {
+                  const active = view === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => navigateTo(item.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm mb-0.5 active-press transition-colors ${
+                        active ? "bg-primary/10 text-primary font-medium" : "text-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+
+                <div className="my-3 h-px bg-border" />
+
                 <p className="text-label text-muted-foreground px-3 mb-2">Engage</p>
                 {engageItems.map((item) => {
                   const active = view === item.id;
