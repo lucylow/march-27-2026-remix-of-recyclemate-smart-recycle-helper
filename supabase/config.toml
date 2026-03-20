@@ -1,1 +1,13 @@
 project_id = "pacdvulnksluironikzc"
+
+[functions.chat]
+verify_jwt = false
+
+[functions.ai-scan]
+verify_jwt = false
+
+[functions.ai-quiz]
+verify_jwt = false
+
+[functions.ai-tips]
+verify_jwt = false
