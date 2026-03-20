@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Award, CheckCircle2, Sparkles } from "lucide-react";
+import { ArrowLeft, MapPin, Award, CheckCircle2, Sparkles, Leaf } from "lucide-react";
 import type { DetectedItem } from "@/context/UserContext";
 import { useUser } from "@/context/UserContext";
 import { getDisposalInstructions, type DisposalInstruction } from "@/services/api";
@@ -76,6 +76,7 @@ const ResultsView = ({ detections, onBack }: ResultsViewProps) => {
           <span className="text-label text-muted-foreground block">
             {detections.length} Item{detections.length > 1 ? "s" : ""} Detected
           </span>
+          <span className="text-[10px] text-primary font-mono">AI-POWERED</span>
         </div>
         <div className="w-10" />
       </div>
@@ -85,7 +86,7 @@ const ResultsView = ({ detections, onBack }: ResultsViewProps) => {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-muted-foreground">Getting recycling rules...</p>
+            <p className="text-sm text-muted-foreground">AI is analyzing your items...</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
@@ -120,6 +121,14 @@ const ResultsView = ({ detections, onBack }: ResultsViewProps) => {
                 <h3 className="text-lg font-semibold tracking-tight mb-2">{inst.item}</h3>
                 <p className="text-muted-foreground leading-relaxed text-sm">{inst.instruction}</p>
 
+                {/* AI Eco Tip */}
+                {inst.ecoTip && (
+                  <div className="flex items-start gap-2 mt-3 pt-3 border-t border-border">
+                    <Leaf className="w-4 h-4 text-success mt-0.5 shrink-0" />
+                    <p className="text-xs text-success font-medium">{inst.ecoTip}</p>
+                  </div>
+                )}
+
                 {/* Confidence bar */}
                 <div className="mt-4 pt-3 border-t border-border">
                   <div className="flex items-center justify-between mb-1.5">
@@ -151,7 +160,7 @@ const ResultsView = ({ detections, onBack }: ResultsViewProps) => {
       </div>
 
       {/* Confirm button */}
-      {!loading && (
+      {!loading && !error && (
         <div className="px-6 pb-6 pt-2">
           {confirmed ? (
             <motion.div

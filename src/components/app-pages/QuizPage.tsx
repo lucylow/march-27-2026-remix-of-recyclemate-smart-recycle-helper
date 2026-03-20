@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Brain, CheckCircle2, XCircle, Trophy, RotateCcw, Sparkles } from "lucide-react";
+import { Brain, CheckCircle2, XCircle, Trophy, RotateCcw, Sparkles, Loader2, Zap } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { toast } from "sonner";
 
@@ -9,86 +9,69 @@ interface QuizQuestion {
   options: string[];
   correct: number;
   explanation: string;
+  difficulty?: string;
 }
 
-const QUIZ_BANK: QuizQuestion[] = [
-  {
-    question: "Can pizza boxes be recycled?",
-    options: ["Yes, always", "Only if clean and grease-free", "No, never", "Only the lid"],
-    correct: 1,
-    explanation: "Pizza boxes can be recycled only if they're free of grease and food residue. Greasy portions should go in compost or garbage.",
-  },
-  {
-    question: "How many times can aluminium be recycled?",
-    options: ["Once", "Up to 10 times", "Indefinitely", "Up to 50 times"],
-    correct: 2,
-    explanation: "Aluminium can be recycled infinitely without losing quality. Recycling one can saves enough energy to run a TV for 3 hours!",
-  },
-  {
-    question: "Should you leave caps on plastic bottles when recycling?",
-    options: ["Yes, always", "No, remove them", "It doesn't matter", "Only for large bottles"],
-    correct: 1,
-    explanation: "Remove caps before recycling. Caps are often made of different plastic and can cause issues during processing.",
-  },
-  {
-    question: "What percentage of the world's plastic has been recycled?",
-    options: ["About 50%", "About 30%", "About 9%", "About 20%"],
-    correct: 2,
-    explanation: "Only about 9% of all plastic ever produced has been recycled. The rest ends up in landfills, incinerators, or the environment.",
-  },
-  {
-    question: "Which item should NOT go in the recycling bin?",
-    options: ["Newspaper", "Glass jar", "Styrofoam container", "Cardboard box"],
-    correct: 2,
-    explanation: "Styrofoam (polystyrene) is not accepted in most curbside recycling programs due to its low density and contamination issues.",
-  },
-  {
-    question: "How long does a glass bottle take to decompose in a landfill?",
-    options: ["100 years", "500 years", "1,000 years", "Up to 1 million years"],
-    correct: 3,
-    explanation: "Glass can take up to 1 million years to decompose. But it can be recycled endlessly without loss of quality!",
-  },
-  {
-    question: "What happens to recycled paper?",
-    options: ["It becomes compost", "It's turned into new paper products", "It's burned for energy", "It's exported overseas"],
-    correct: 1,
-    explanation: "Recycled paper is pulped and turned into new paper products like newspapers, cardboard, and tissue paper.",
-  },
-  {
-    question: "Are black plastic containers recyclable?",
-    options: ["Yes, like any plastic", "Usually not", "Only in special bins", "Only if labelled"],
-    correct: 1,
-    explanation: "Most sorting facilities use infrared sensors that can't detect black plastic, so it often ends up in landfill.",
-  },
-  {
-    question: "What's the most recycled material in the world?",
-    options: ["Plastic", "Paper", "Steel", "Glass"],
-    correct: 2,
-    explanation: "Steel is the most recycled material globally. Over 80% of steel is recycled, far exceeding paper, plastic, and glass.",
-  },
-  {
-    question: "Can you recycle shredded paper?",
-    options: ["Yes, in a bag", "No, pieces are too small", "Only at special centres", "Yes, loose in the bin"],
-    correct: 0,
-    explanation: "Shredded paper can be recycled if placed in a clear bag or paper envelope, so the small pieces don't contaminate other recyclables.",
-  },
+const QUIZ_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-quiz`;
+
+const FALLBACK_QUESTIONS: QuizQuestion[] = [
+  { question: "Can pizza boxes be recycled?", options: ["Yes, always", "Only if clean and grease-free", "No, never", "Only the lid"], correct: 1, explanation: "Pizza boxes can be recycled only if they're free of grease and food residue." },
+  { question: "How many times can aluminium be recycled?", options: ["Once", "Up to 10 times", "Indefinitely", "Up to 50 times"], correct: 2, explanation: "Aluminium can be recycled infinitely without losing quality." },
+  { question: "Should you leave caps on plastic bottles when recycling?", options: ["Yes, always", "No, remove them", "It doesn't matter", "Only for large bottles"], correct: 1, explanation: "Remove caps before recycling. Caps are often made of different plastic." },
+  { question: "What percentage of the world's plastic has been recycled?", options: ["About 50%", "About 30%", "About 9%", "About 20%"], correct: 2, explanation: "Only about 9% of all plastic ever produced has been recycled." },
+  { question: "Which item should NOT go in the recycling bin?", options: ["Newspaper", "Glass jar", "Styrofoam container", "Cardboard box"], correct: 2, explanation: "Styrofoam is not accepted in most curbside recycling programs." },
 ];
 
 const POINTS_PER_CORRECT = 5;
 const QUIZ_SIZE = 5;
 
+const DIFFICULTY_COLORS: Record<string, string> = {
+  easy: "bg-success/10 text-success",
+  medium: "bg-warning/10 text-warning",
+  hard: "bg-destructive/10 text-destructive",
+};
+
 const QuizPage = () => {
   const { addPoints } = useUser();
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [aiPowered, setAiPowered] = useState(false);
 
-  const questions = useMemo(() => {
-    const shuffled = [...QUIZ_BANK].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, QUIZ_SIZE);
-  }, []);
+  const fetchQuestions = async () => {
+    setLoading(true);
+    try {
+      const resp = await fetch(QUIZ_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ count: QUIZ_SIZE, difficulty: "mixed" }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setQuestions(data);
+          setAiPowered(true);
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("AI quiz generation failed, using fallback:", e);
+    }
+    setQuestions([...FALLBACK_QUESTIONS].sort(() => Math.random() - 0.5));
+    setAiPowered(false);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchQuestions(); }, []);
 
   const current = questions[currentIndex];
 
@@ -122,7 +105,17 @@ const QuizPage = () => {
     setAnswered(false);
     setScore(0);
     setFinished(false);
+    fetchQuestions();
   };
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">AI is generating fresh questions...</p>
+      </div>
+    );
+  }
 
   if (finished) {
     const pct = Math.round((score / questions.length) * 100);
@@ -148,7 +141,7 @@ const QuizPage = () => {
         </p>
         <button onClick={handleRestart} className="flex items-center gap-2 px-6 py-3 bg-foreground text-background rounded-2xl font-medium active-press">
           <RotateCcw className="w-4 h-4" />
-          Play Again
+          New AI Quiz
         </button>
       </div>
     );
@@ -157,8 +150,17 @@ const QuizPage = () => {
   return (
     <div className="flex-1 overflow-y-auto p-6 flex flex-col">
       <div className="mb-6">
-        <h1 className="text-display mb-1">Recycling Quiz</h1>
-        <p className="text-sm text-muted-foreground">Test your recycling knowledge</p>
+        <div className="flex items-center gap-2 mb-1">
+          <h1 className="text-display">Recycling Quiz</h1>
+          {aiPowered && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-[10px] font-semibold">
+              <Zap className="w-3 h-3" /> AI
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {aiPowered ? "Fresh AI-generated questions every time" : "Test your recycling knowledge"}
+        </p>
       </div>
 
       {/* Progress bar */}
@@ -173,7 +175,6 @@ const QuizPage = () => {
         <span className="font-mono text-xs text-muted-foreground">{currentIndex + 1}/{questions.length}</span>
       </div>
 
-      {/* Question */}
       <AnimatePresence mode="wait">
         <motion.div
           key={currentIndex}
@@ -187,10 +188,16 @@ const QuizPage = () => {
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Brain className="w-5 h-5 text-primary" />
             </div>
-            <h2 className="text-lg font-semibold leading-snug pt-1.5">{current.question}</h2>
+            <div>
+              <h2 className="text-lg font-semibold leading-snug pt-1.5">{current.question}</h2>
+              {current.difficulty && (
+                <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-medium uppercase ${DIFFICULTY_COLORS[current.difficulty] || "bg-secondary text-muted-foreground"}`}>
+                  {current.difficulty}
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Options */}
           <div className="space-y-3 mb-6">
             {current.options.map((opt, idx) => {
               let style = "border-border bg-card hover:bg-secondary";
@@ -220,7 +227,6 @@ const QuizPage = () => {
             })}
           </div>
 
-          {/* Explanation */}
           <AnimatePresence>
             {answered && (
               <motion.div
@@ -234,7 +240,6 @@ const QuizPage = () => {
             )}
           </AnimatePresence>
 
-          {/* Next button */}
           {answered && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-auto">
               <button onClick={handleNext} className="w-full py-4 bg-foreground text-background rounded-2xl font-medium active-press">
