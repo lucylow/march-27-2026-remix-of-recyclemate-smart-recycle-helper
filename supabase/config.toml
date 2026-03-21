@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.ai-tips]
 verify_jwt = false
+
+[functions.ai-vision]
+verify_jwt = false
