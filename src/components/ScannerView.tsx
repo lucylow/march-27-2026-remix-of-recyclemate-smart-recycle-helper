@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Scan, Loader2, ImagePlus, Flashlight, FlashlightOff, X } from "lucide-react";
-import { runInference } from "@/services/tflite";
+import { Camera, Scan, Loader2, ImagePlus, Flashlight, FlashlightOff, X, Eye, Zap } from "lucide-react";
+import { runInference, captureFrame, fileToBase64 } from "@/services/tflite";
 import type { DetectedItem } from "@/context/UserContext";
 import { toast } from "sonner";
 
@@ -19,6 +19,8 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
   const [torchOn, setTorchOn] = useState(false);
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
   const [scanCount, setScanCount] = useState(0);
+  const [aiMode, setAiMode] = useState(true);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const viewfinderRef = useRef<HTMLDivElement>(null);
@@ -27,7 +29,7 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: 640, height: 480 },
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -35,6 +37,7 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
         setCameraActive(true);
       }
     } catch {
+      toast.error("Camera access denied. You can still upload images.");
       setCameraActive(true);
     }
   }, []);
@@ -44,6 +47,7 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
     streamRef.current = null;
     setCameraActive(false);
     setTorchOn(false);
+    setPreviewImage(null);
   }, []);
 
   useEffect(() => {
@@ -80,15 +84,25 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsScanning(true);
-    toast.info("Analyzing image...");
+    setDetections([]);
+
     try {
-      const results = await runInference();
+      const base64 = await fileToBase64(file);
+      setPreviewImage(base64);
+      toast.info(aiMode ? "🤖 AI analyzing your image..." : "Analyzing image...");
+
+      const results = await runInference(aiMode ? base64 : undefined);
       setDetections(results);
-      toast.success(`Found ${results.length} item${results.length > 1 ? "s" : ""}`);
-      setTimeout(() => onDetection(results), 800);
-    } catch (err) {
+
+      if (results.length === 0) {
+        toast.info("No waste items detected. Try a clearer image.");
+      } else {
+        toast.success(`Found ${results.length} item${results.length > 1 ? "s" : ""}`);
+        setTimeout(() => onDetection(results), 1000);
+      }
+    } catch (err: any) {
       console.error("Gallery inference error:", err);
-      toast.error("Failed to analyze image. Please try again.");
+      toast.error(err.message || "Failed to analyze image. Please try again.");
     } finally {
       setIsScanning(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -102,15 +116,32 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
     setScanCount(prev => prev + 1);
 
     try {
-      const results = await runInference();
+      let imageData: string | undefined;
+
+      if (aiMode && videoRef.current && streamRef.current) {
+        const frame = captureFrame(videoRef.current);
+        if (frame) {
+          imageData = frame;
+          setPreviewImage(frame);
+        }
+      }
+
+      toast.info(aiMode && imageData ? "🤖 AI Vision analyzing..." : "Scanning...");
+      const results = await runInference(imageData);
+
       setDetections(results);
       setShowPulse(true);
       setTimeout(() => setShowPulse(false), 400);
-      toast.success(`Detected: ${results.map(r => r.displayName).join(", ")}`);
-      setTimeout(() => onDetection(results), 1200);
-    } catch (err) {
+
+      if (results.length === 0) {
+        toast.info("No items detected. Try pointing at a recyclable item.");
+      } else {
+        toast.success(`Detected: ${results.map(r => r.displayName).join(", ")}`);
+        setTimeout(() => onDetection(results), 1200);
+      }
+    } catch (err: any) {
       console.error("Scan inference error:", err);
-      toast.error("Scan failed. Please try again.");
+      toast.error(err.message || "Scan failed. Please try again.");
     } finally {
       setIsScanning(false);
     }
@@ -123,6 +154,7 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        capture="environment"
         className="hidden"
         onChange={handleFileChange}
       />
@@ -135,13 +167,18 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
       >
         {cameraActive ? (
           <>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 w-full h-full object-cover"
-            />
+            {/* Video feed or uploaded preview */}
+            {previewImage && !streamRef.current ? (
+              <img src={previewImage} alt="Scanned" className="absolute inset-0 w-full h-full object-contain bg-black" />
+            ) : (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            )}
 
             {/* Corner brackets */}
             <div className="absolute inset-6 pointer-events-none">
@@ -183,7 +220,7 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
                     height: `${det.bbox[3] * 100}%`,
                   }}
                 >
-                  <span className="absolute -top-6 left-0 font-mono text-[10px] tracking-wider text-primary bg-foreground/80 px-2 py-0.5 rounded-md uppercase">
+                  <span className="absolute -top-6 left-0 font-mono text-[10px] tracking-wider text-primary bg-foreground/80 px-2 py-0.5 rounded-md uppercase whitespace-nowrap">
                     {det.displayName} — {(det.confidence * 100).toFixed(1)}%
                   </span>
                 </motion.div>
@@ -211,17 +248,37 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
                   <FlashlightOff className="w-4 h-4 text-background/70" />
                 )}
               </button>
-              <div className="px-3 py-1.5 rounded-lg bg-foreground/40 backdrop-blur-sm">
-                <span className="font-mono text-[10px] text-background/70 tracking-wider">
-                  {scanCount > 0 ? `${scanCount} SCANS` : "READY"}
+
+              {/* AI Mode Toggle */}
+              <button
+                onClick={() => setAiMode(!aiMode)}
+                className={`px-3 py-1.5 rounded-lg backdrop-blur-sm flex items-center gap-1.5 transition-colors ${
+                  aiMode ? "bg-primary/80 text-primary-foreground" : "bg-foreground/40 text-background/70"
+                }`}
+              >
+                {aiMode ? <Eye className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
+                <span className="font-mono text-[10px] tracking-wider">
+                  {aiMode ? "AI VISION" : "OFFLINE"}
                 </span>
-              </div>
+              </button>
+
               <button
                 onClick={handleGalleryUpload}
                 className="w-10 h-10 rounded-xl bg-foreground/40 backdrop-blur-sm flex items-center justify-center active-press"
               >
                 <ImagePlus className="w-4 h-4 text-background/70" />
               </button>
+            </div>
+
+            {/* Bottom info bar */}
+            <div className="absolute bottom-2 left-4 right-4 flex items-center justify-center">
+              <div className="px-3 py-1 rounded-lg bg-foreground/40 backdrop-blur-sm">
+                <span className="font-mono text-[10px] text-background/70 tracking-wider">
+                  {isScanning
+                    ? aiMode ? "AI ANALYZING..." : "SCANNING..."
+                    : scanCount > 0 ? `${scanCount} SCANS` : "READY"}
+                </span>
+              </div>
             </div>
           </>
         ) : (
@@ -274,7 +331,6 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
               whileTap={{ scale: 0.9 }}
               className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-elevated disabled:opacity-50 relative"
             >
-              {/* Outer ring */}
               <div className="absolute inset-0 rounded-full border-[3px] border-background/20" />
               {isScanning ? (
                 <Loader2 className="w-8 h-8 text-primary-foreground animate-spin" />
