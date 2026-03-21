@@ -2,18 +2,75 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const TIMEOUT_MS = 30_000;
+
+function errorResponse(message: string, status: number) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function handleGatewayError(status: number, body: string): Response {
+  if (status === 429) return errorResponse("Rate limit exceeded. Please wait a moment and try again.", 429);
+  if (status === 402) return errorResponse("AI credits exhausted. Please add funds to continue.", 402);
+  console.error(`[chat] Gateway ${status}:`, body.slice(0, 500));
+  return errorResponse("AI service temporarily unavailable. Please try again.", 502);
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const start = Date.now();
   try {
-    const { messages } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    // Input validation
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return errorResponse("Invalid JSON body", 400);
+    }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const { messages } = body;
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return errorResponse("'messages' must be a non-empty array", 400);
+    }
+    if (messages.length > 50) {
+      return errorResponse("Too many messages. Maximum 50 allowed.", 400);
+    }
+
+    // Validate each message has role and content
+    for (const msg of messages) {
+      if (!msg.role || !msg.content) {
+        return errorResponse("Each message must have 'role' and 'content'", 400);
+      }
+      if (typeof msg.content === "string" && msg.content.length > 10_000) {
+        return errorResponse("Message content too long. Maximum 10,000 characters.", 400);
+      }
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      console.error("[chat] LOVABLE_API_KEY not configured");
+      return errorResponse("AI service not configured", 500);
+    }
+
+    const response = await fetchWithTimeout(GATEWAY_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -24,47 +81,46 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are RecycleMate AI — a friendly, knowledgeable recycling and sustainability assistant. 
-You help users understand how to properly dispose of items, explain recycling processes, and share eco-friendly tips.
-Keep answers concise but informative (2-4 paragraphs max). Use emoji sparingly for friendliness.
-If unsure about a local regulation, say so and recommend checking the municipal website.
-Format responses with markdown for readability.`,
+            content: `You are **RecycleMate AI** — a friendly, expert recycling and sustainability assistant built into the RecycleMate app.
+
+Your capabilities:
+- Identify how to properly dispose of any item (plastic types, metals, glass, organics, e-waste, hazardous materials)
+- Explain recycling processes and why certain materials can/cannot be recycled
+- Provide location-aware advice (when the user mentions their area)
+- Share surprising eco-facts and practical sustainability tips
+- Debunk common recycling myths
+
+Guidelines:
+- Keep answers concise: 2-4 short paragraphs max
+- Use **bold** for key terms and bullet points for lists
+- Use emoji sparingly (1-2 per response) for warmth
+- If unsure about local regulations, clearly state that and suggest checking the local municipal website
+- Always be encouraging — celebrate good recycling habits
+- When discussing materials, mention the resin code (e.g., PET #1, HDPE #2) when relevant
+- Format with markdown for readability`,
           },
           ...messages,
         ],
         stream: true,
       }),
-    });
+    }, TIMEOUT_MS);
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI service unavailable" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const body = await response.text();
+      return handleGatewayError(response.status, body);
     }
+
+    console.log(`[chat] Stream started in ${Date.now() - start}ms, ${messages.length} messages`);
 
     return new Response(response.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
-    console.error("chat error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    if (e instanceof DOMException && e.name === "AbortError") {
+      console.error(`[chat] Request timed out after ${TIMEOUT_MS}ms`);
+      return errorResponse("Request timed out. Please try a shorter question.", 504);
+    }
+    console.error(`[chat] Error after ${Date.now() - start}ms:`, e);
+    return errorResponse(e instanceof Error ? e.message : "Internal error", 500);
   }
 });
