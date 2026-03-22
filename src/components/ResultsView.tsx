@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Award, CheckCircle2, Sparkles, Leaf } from "lucide-react";
+import { ArrowLeft, MapPin, Award, CheckCircle2, Sparkles, Leaf, MessageCircle } from "lucide-react";
 import type { DetectedItem } from "@/context/UserContext";
 import { useUser } from "@/context/UserContext";
 import { getDisposalInstructions, type DisposalInstruction } from "@/services/api";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 interface ResultsViewProps {
   detections: DetectedItem[];
   onBack: () => void;
+  onNavigate?: (page: string, prefill?: string) => void;
 }
 
 const brandSpring = { type: "spring" as const, stiffness: 500, damping: 30, mass: 1 };
@@ -20,7 +21,7 @@ const BIN_STYLES: Record<string, { bg: string; text: string; border: string }> =
   warning: { bg: "bg-warning", text: "text-warning-foreground", border: "border-warning/20" },
 };
 
-const ResultsView = ({ detections, onBack }: ResultsViewProps) => {
+const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
   const [instructions, setInstructions] = useState<DisposalInstruction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +58,12 @@ const ResultsView = ({ detections, onBack }: ResultsViewProps) => {
     setConfirmed(true);
     toast.success(`+${pts} points earned! Keep sorting! 🌍`);
     setTimeout(onBack, 1800);
+  };
+
+  const handleAskAI = (itemName: string) => {
+    if (onNavigate) {
+      onNavigate("chat", `Tell me more about recycling ${itemName}. What are some creative ways to reuse it?`);
+    }
   };
 
   return (
@@ -152,6 +159,17 @@ const ResultsView = ({ detections, onBack }: ResultsViewProps) => {
                     <MapPin className="w-4 h-4 text-warning mt-0.5 shrink-0" />
                     <p className="font-mono text-xs text-muted-foreground">{inst.dropoff}</p>
                   </div>
+                )}
+
+                {/* Ask AI button */}
+                {onNavigate && (
+                  <button
+                    onClick={() => handleAskAI(inst.item)}
+                    className="mt-3 pt-3 border-t border-border w-full flex items-center justify-center gap-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors active-press"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    Ask AI more about this item
+                  </button>
                 )}
               </motion.div>
             );

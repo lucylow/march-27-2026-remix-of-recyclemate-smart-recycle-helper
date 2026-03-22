@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Lightbulb, RefreshCw, Loader2 } from "lucide-react";
+import { Lightbulb, RefreshCw, Loader2, Share2 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { toast } from "sonner";
 
@@ -36,8 +36,8 @@ const TipsPage = () => {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          scanHistory: scanHistory.slice(0, 10).map((r) => ({
-            items: r.items.map((i) => ({ displayName: i.displayName })),
+          scanHistory: scanHistory.slice(0, 15).map((r) => ({
+            items: r.items.map((i) => ({ displayName: i.displayName, label: i.label })),
           })),
           points,
           streak,
@@ -46,6 +46,8 @@ const TipsPage = () => {
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
+        if (resp.status === 429) toast.error("Rate limited — try again shortly");
+        else if (resp.status === 402) toast.error("AI credits exhausted");
         throw new Error(err.error || "Failed to fetch tips");
       }
 
@@ -53,7 +55,7 @@ const TipsPage = () => {
       setTips(data);
     } catch (e) {
       console.error("Tips error:", e);
-      toast.error("Couldn't load tips. Try again!");
+      toast.error("Couldn't load tips. Showing defaults.");
       setTips([
         { title: "Start Scanning!", tip: "Use the scanner to identify items and get personalized tips based on your habits.", category: "recycling", emoji: "📸" },
         { title: "Rinse Before Recycling", tip: "A quick rinse removes food residue and prevents contamination of recyclable materials.", category: "recycling", emoji: "💧" },
@@ -66,12 +68,28 @@ const TipsPage = () => {
 
   useEffect(() => { fetchTips(); }, []);
 
+  const handleShare = async (tip: EcoTip) => {
+    const text = `${tip.emoji} ${tip.title}\n${tip.tip}\n\n— via RecycleMate 🌍`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(text);
+      toast.success("Tip copied to clipboard!");
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-display mb-1">Daily Tips</h1>
-          <p className="text-sm text-muted-foreground">AI-personalized for your habits</p>
+          <p className="text-sm text-muted-foreground">
+            {scanHistory.length > 0
+              ? `Personalized from ${scanHistory.length} scan${scanHistory.length > 1 ? "s" : ""}`
+              : "AI-personalized for your habits"}
+          </p>
         </div>
         <button
           onClick={fetchTips}
@@ -108,6 +126,13 @@ const TipsPage = () => {
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed">{tip.tip}</p>
                 </div>
+                <button
+                  onClick={() => handleShare(tip)}
+                  className="w-8 h-8 rounded-lg bg-secondary/50 flex items-center justify-center shrink-0 hover:bg-secondary transition-colors"
+                  title="Share tip"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
               </div>
             </motion.div>
           ))}

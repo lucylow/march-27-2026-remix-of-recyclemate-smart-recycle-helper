@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, Loader2, Sparkles } from "lucide-react";
+import { Send, Bot, User, Loader2, Sparkles, MessageSquarePlus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { useUser } from "@/context/UserContext";
+import { toast } from "sonner";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -12,9 +14,12 @@ const SUGGESTIONS = [
   "How do I dispose of batteries safely?",
   "What plastics are actually recyclable?",
   "Tips for reducing household waste",
+  "Analyze my recycling habits",
+  "What's my environmental impact so far?",
 ];
 
 const ChatPage = () => {
+  const { scanHistory, points, streak } = useUser();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -44,6 +49,11 @@ const ChatPage = () => {
       });
     };
 
+    // Build user context from scan history
+    const recentScans = scanHistory
+      .slice(0, 10)
+      .flatMap((r) => r.items.map((i) => i.displayName));
+
     try {
       const resp = await fetch(CHAT_URL, {
         method: "POST",
@@ -51,11 +61,24 @@ const ChatPage = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages }),
+        body: JSON.stringify({
+          messages: allMessages,
+          userContext: {
+            points,
+            streak,
+            recentScans,
+            totalScans: scanHistory.length,
+          },
+        }),
       });
 
       if (!resp.ok || !resp.body) {
         const errorData = await resp.json().catch(() => ({}));
+        if (resp.status === 429) {
+          toast.error("Rate limited — please wait a moment");
+        } else if (resp.status === 402) {
+          toast.error("AI credits exhausted");
+        }
         throw new Error(errorData.error || "Failed to connect to AI");
       }
 
@@ -113,12 +136,32 @@ const ChatPage = () => {
     }
   };
 
+  const handleNewChat = () => {
+    setMessages([]);
+    setInput("");
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
       {/* Header */}
-      <div className="px-6 pt-6 pb-3">
-        <h1 className="text-display mb-1">AI Assistant</h1>
-        <p className="text-sm text-muted-foreground">Ask anything about recycling & sustainability</p>
+      <div className="px-6 pt-6 pb-3 flex items-center justify-between">
+        <div>
+          <h1 className="text-display mb-1">AI Assistant</h1>
+          <p className="text-sm text-muted-foreground">
+            {scanHistory.length > 0
+              ? `Personalized with ${scanHistory.length} scan${scanHistory.length > 1 ? "s" : ""}`
+              : "Ask anything about recycling & sustainability"}
+          </p>
+        </div>
+        {messages.length > 0 && (
+          <button
+            onClick={handleNewChat}
+            className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center active-press"
+            title="New chat"
+          >
+            <MessageSquarePlus className="w-5 h-5 text-muted-foreground" />
+          </button>
+        )}
       </div>
 
       {/* Messages */}
@@ -129,10 +172,12 @@ const ChatPage = () => {
               <Sparkles className="w-8 h-8 text-primary" />
             </div>
             <p className="text-sm text-muted-foreground text-center max-w-[260px]">
-              Hi! I'm your AI recycling assistant. Ask me anything about waste sorting and sustainability.
+              {scanHistory.length > 0
+                ? `I know your recycling history! Ask me for personalized advice based on your ${scanHistory.length} scans.`
+                : "Hi! I'm your AI recycling assistant. Ask me anything about waste sorting and sustainability."}
             </p>
             <div className="flex flex-wrap gap-2 justify-center max-w-sm">
-              {SUGGESTIONS.map((s) => (
+              {SUGGESTIONS.slice(0, scanHistory.length > 0 ? 6 : 4).map((s) => (
                 <button
                   key={s}
                   onClick={() => sendMessage(s)}

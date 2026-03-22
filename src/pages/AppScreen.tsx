@@ -256,7 +256,7 @@ const AppScreen = () => {
           <AnimatePresence mode="wait">
             {view === "scanner" && <ScannerView key="scanner" onDetection={handleDetection} />}
             {view === "results" && (
-              <ResultsView key="results" detections={detections} onBack={() => setView("scanner")} />
+              <ResultsView key="results" detections={detections} onBack={() => setView("scanner")} onNavigate={(page) => setView(page as AppView)} />
             )}
             {view === "profile" && <ProfileView key="profile" onBack={() => setView("scanner")} />}
             {view === "history" && (

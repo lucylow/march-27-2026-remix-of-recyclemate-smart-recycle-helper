@@ -38,7 +38,6 @@ serve(async (req) => {
 
   const start = Date.now();
   try {
-    // Input validation
     let body: any;
     try {
       body = await req.json();
@@ -46,7 +45,7 @@ serve(async (req) => {
       return errorResponse("Invalid JSON body", 400);
     }
 
-    const { messages } = body;
+    const { messages, userContext } = body;
     if (!Array.isArray(messages) || messages.length === 0) {
       return errorResponse("'messages' must be a non-empty array", 400);
     }
@@ -54,7 +53,6 @@ serve(async (req) => {
       return errorResponse("Too many messages. Maximum 50 allowed.", 400);
     }
 
-    // Validate each message has role and content
     for (const msg of messages) {
       if (!msg.role || !msg.content) {
         return errorResponse("Each message must have 'role' and 'content'", 400);
@@ -68,6 +66,20 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) {
       console.error("[chat] LOVABLE_API_KEY not configured");
       return errorResponse("AI service not configured", 500);
+    }
+
+    // Build contextual system prompt with user data
+    let contextBlock = "";
+    if (userContext) {
+      const parts: string[] = [];
+      if (userContext.points != null) parts.push(`Points: ${userContext.points}`);
+      if (userContext.streak != null) parts.push(`Streak: ${userContext.streak} days`);
+      if (Array.isArray(userContext.recentScans) && userContext.recentScans.length > 0) {
+        parts.push(`Recently scanned: ${userContext.recentScans.slice(0, 10).join(", ")}`);
+      }
+      if (parts.length > 0) {
+        contextBlock = `\n\nUser context (use to personalize answers):\n${parts.join("\n")}`;
+      }
     }
 
     const response = await fetchWithTimeout(GATEWAY_URL, {
@@ -89,6 +101,7 @@ Your capabilities:
 - Provide location-aware advice (when the user mentions their area)
 - Share surprising eco-facts and practical sustainability tips
 - Debunk common recycling myths
+- Analyze the user's scan history to give personalized advice
 
 Guidelines:
 - Keep answers concise: 2-4 short paragraphs max
@@ -97,7 +110,8 @@ Guidelines:
 - If unsure about local regulations, clearly state that and suggest checking the local municipal website
 - Always be encouraging — celebrate good recycling habits
 - When discussing materials, mention the resin code (e.g., PET #1, HDPE #2) when relevant
-- Format with markdown for readability`,
+- If the user has scan history, reference it to make answers personal
+- Format with markdown for readability${contextBlock}`,
           },
           ...messages,
         ],
