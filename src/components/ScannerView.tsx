@@ -235,10 +235,15 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
               )}
             </AnimatePresence>
 
-            {/* Detection bounding boxes — improved labels */}
+            {/* Detection bounding boxes with confidence rings */}
             <AnimatePresence>
               {detections.map((det, i) => {
                 const labelColor = BIN_LABEL_COLORS[det.label] || "bg-primary/80";
+                const isRecyclable = det.recyclable !== false;
+                const borderColor = isRecyclable ? "border-emerald-400" : "border-red-400";
+                const glowColor = isRecyclable
+                  ? "0 0 12px rgba(52,211,153,0.4), inset 0 0 8px rgba(52,211,153,0.1)"
+                  : "0 0 12px rgba(248,113,113,0.4), inset 0 0 8px rgba(248,113,113,0.1)";
                 return (
                   <motion.div
                     key={`${det.label}-${i}`}
@@ -246,28 +251,29 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
                     animate={{ opacity: 1, scale: showPulse ? 1.03 : 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={brandSpring}
-                    className="absolute border-2 border-primary rounded-xl pointer-events-none"
+                    className={`absolute border-2 ${borderColor} rounded-xl pointer-events-none`}
                     style={{
                       left: `${det.bbox[0] * 100}%`,
                       top: `${det.bbox[1] * 100}%`,
                       width: `${det.bbox[2] * 100}%`,
                       height: `${det.bbox[3] * 100}%`,
-                      boxShadow: "0 0 12px rgba(59,130,246,0.3), inset 0 0 12px rgba(59,130,246,0.1)",
+                      boxShadow: glowColor,
                     }}
                   >
                     {/* Glowing corners */}
-                    <div className="absolute -top-px -left-px w-3 h-3 border-t-2 border-l-2 border-primary rounded-tl-md" />
-                    <div className="absolute -top-px -right-px w-3 h-3 border-t-2 border-r-2 border-primary rounded-tr-md" />
-                    <div className="absolute -bottom-px -left-px w-3 h-3 border-b-2 border-l-2 border-primary rounded-bl-md" />
-                    <div className="absolute -bottom-px -right-px w-3 h-3 border-b-2 border-r-2 border-primary rounded-br-md" />
+                    <div className={`absolute -top-px -left-px w-3 h-3 border-t-2 border-l-2 ${borderColor} rounded-tl-md`} />
+                    <div className={`absolute -top-px -right-px w-3 h-3 border-t-2 border-r-2 ${borderColor} rounded-tr-md`} />
+                    <div className={`absolute -bottom-px -left-px w-3 h-3 border-b-2 border-l-2 ${borderColor} rounded-bl-md`} />
+                    <div className={`absolute -bottom-px -right-px w-3 h-3 border-b-2 border-r-2 ${borderColor} rounded-br-md`} />
 
-                    {/* Label chip */}
+                    {/* Label chip with recyclable indicator */}
                     <motion.div
                       initial={{ y: -4, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
                       transition={{ delay: 0.15 }}
-                      className={`absolute -top-7 left-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${labelColor} backdrop-blur-md shadow-lg`}
+                      className={`absolute -top-8 left-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${labelColor} backdrop-blur-md shadow-lg`}
                     >
+                      <span className="text-[10px]">{isRecyclable ? "♻️" : "🚫"}</span>
                       <span className="font-semibold text-[11px] text-white whitespace-nowrap leading-none">
                         {det.displayName}
                       </span>
@@ -275,9 +281,42 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
                         {(det.confidence * 100).toFixed(0)}%
                       </span>
                     </motion.div>
+
+                    {/* Confidence ring in bottom-right corner */}
+                    <div className="absolute -bottom-2 -right-2 w-7 h-7">
+                      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                        <circle cx="18" cy="18" r="14" fill="rgba(0,0,0,0.6)" stroke="rgba(255,255,255,0.15)" strokeWidth="3" />
+                        <circle
+                          cx="18" cy="18" r="14"
+                          fill="none"
+                          stroke={isRecyclable ? "#34d399" : "#f87171"}
+                          strokeWidth="3"
+                          strokeDasharray={`${det.confidence * 88} 88`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </div>
                   </motion.div>
                 );
               })}
+            </AnimatePresence>
+
+            {/* Live item counter badge */}
+            <AnimatePresence>
+              {detections.length > 0 && !isScanning && (
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  className="absolute top-3 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center gap-2"
+                >
+                  <span className="text-xs font-bold text-white">{detections.length}</span>
+                  <span className="text-[10px] text-white/60 font-mono">ITEMS FOUND</span>
+                  {detections.some(d => d.recyclable !== false) && (
+                    <span className="text-[10px]">♻️</span>
+                  )}
+                </motion.div>
+              )}
             </AnimatePresence>
 
             {/* Scanning animation — horizontal line + shimmer */}
