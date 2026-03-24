@@ -23,6 +23,12 @@ export interface DetectedItem {
   displayName: string;
   confidence: number;
   bbox: [number, number, number, number];
+  recyclable?: boolean;
+  category?: string;
+  materialDetail?: string;
+  co2SavedGrams?: number;
+  decompositionYears?: number;
+  funFact?: string;
 }
 
 const UserContext = createContext<UserContextType | null>(null);
