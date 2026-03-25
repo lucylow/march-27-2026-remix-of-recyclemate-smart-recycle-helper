@@ -264,6 +264,15 @@ const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
                           <p className="text-xs text-success font-medium">{inst.ecoTip}</p>
                         </div>
                       )}
+                      {inst.ecoAlternative && (
+                        <div className="flex items-start gap-2 p-3 rounded-xl bg-accent border border-accent-foreground/10">
+                          <Recycle className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1">Eco Alternative</p>
+                            <p className="text-xs text-foreground leading-relaxed">{inst.ecoAlternative}</p>
+                          </div>
+                        </div>
+                      )}
                       {inst.dropoff && (
                         <div className="flex items-start gap-2">
                           <MapPin className="w-4 h-4 text-warning mt-0.5 shrink-0" />

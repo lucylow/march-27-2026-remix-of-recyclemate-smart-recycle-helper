@@ -1,16 +1,46 @@
-import { useMemo } from "react";
-import { motion } from "framer-motion";
-import { Leaf, Droplets, TreePine, Recycle } from "lucide-react";
+import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Leaf, Droplets, TreePine, Recycle, Loader2, Sparkles, Target, TrendingUp, Award, ChevronRight, RefreshCw } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { toast } from "sonner";
 
 const CO2_PER_ITEM = 0.157;
 const WATER_PER_ITEM = 7.6;
 const TREES_PER_ITEM = 0.02;
+const REPORT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-impact-report`;
+
+interface ImpactReport {
+  headline: string;
+  summary: string;
+  grade: string;
+  co2Equivalency: string;
+  strengths: string[];
+  improvements: string[];
+  challengeOfTheWeek: string;
+  funStats: string[];
+  nextMilestone: string;
+  stats: {
+    totalScans: number;
+    totalItems: number;
+    recyclableCount: number;
+    recyclingRate: number;
+    totalCo2: number;
+    points: number;
+    streak: number;
+  };
+}
+
+const GRADE_COLORS: Record<string, string> = {
+  "A+": "text-success", "A": "text-success", "A-": "text-success",
+  "B+": "text-primary", "B": "text-primary", "B-": "text-primary",
+  "C+": "text-warning", "C": "text-warning", "C-": "text-warning",
+  "D": "text-destructive", "F": "text-destructive",
+};
 
 const ProgressBar = ({ value, max, color = "bg-primary" }: { value: number; max: number; color?: string }) => {
   const pct = Math.min((value / max) * 100, 100);
@@ -36,13 +66,57 @@ const weeklyChartConfig: ChartConfig = {
 };
 
 const ImpactPage = () => {
-  const { scanHistory } = useUser();
-  const totalItems = scanHistory.reduce((sum, r) => sum + r.items.length, 0);
+  const { scanHistory, points, streak } = useUser();
+  const [report, setReport] = useState<ImpactReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
+  const totalItems = scanHistory.reduce((sum, r) => sum + r.items.length, 0);
   const co2Saved = (totalItems * CO2_PER_ITEM).toFixed(1);
   const waterSaved = Math.round(totalItems * WATER_PER_ITEM);
   const treesEquiv = (totalItems * TREES_PER_ITEM).toFixed(2);
   const monthlyGoal = 200;
+
+  const fetchReport = async () => {
+    setReportLoading(true);
+    try {
+      const resp = await fetch(REPORT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          scanHistory: scanHistory.slice(0, 30).map((r) => ({
+            items: r.items.map((i) => ({
+              displayName: i.displayName,
+              label: i.label,
+              recyclable: i.recyclable,
+              category: i.category,
+              co2SavedGrams: i.co2SavedGrams,
+            })),
+          })),
+          points,
+          streak,
+          totalScans: scanHistory.length,
+        }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        if (resp.status === 429) toast.error("Rate limited — try again shortly");
+        else if (resp.status === 402) toast.error("AI credits exhausted");
+        throw new Error(err.error || "Failed to generate report");
+      }
+
+      const data = await resp.json();
+      setReport(data);
+    } catch (e) {
+      console.error("Impact report error:", e);
+      toast.error("Couldn't generate report. Try again.");
+    } finally {
+      setReportLoading(false);
+    }
+  };
 
   // Build daily CO₂ chart data from scan history (last 14 days)
   const co2DailyData = useMemo(() => {
@@ -59,7 +133,6 @@ const ImpactPage = () => {
         days[key] += r.items.length * CO2_PER_ITEM;
       }
     });
-    // cumulative
     let cumulative = 0;
     return Object.entries(days).map(([date, val]) => {
       cumulative += val;
@@ -101,15 +174,9 @@ const ImpactPage = () => {
   ];
 
   const LABEL_NAMES: Record<string, string> = {
-    plastic_bottle: "Plastic",
-    aluminum_can: "Aluminum",
-    cardboard: "Cardboard",
-    glass_bottle: "Glass",
-    newspaper: "Paper",
-    styrofoam: "Styrofoam",
-    battery: "Battery",
-    food_waste: "Organic",
-    electronic_waste: "E-Waste",
+    plastic_bottle: "Plastic", aluminum_can: "Aluminum", cardboard: "Cardboard",
+    glass_bottle: "Glass", newspaper: "Paper", styrofoam: "Styrofoam",
+    battery: "Battery", food_waste: "Organic", electronic_waste: "E-Waste",
   };
 
   const materialData = useMemo(() => {
@@ -136,10 +203,120 @@ const ImpactPage = () => {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-display mb-1">Your Impact</h1>
-        <p className="text-sm text-muted-foreground">Environmental contribution tracker</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-display mb-1">Your Impact</h1>
+          <p className="text-sm text-muted-foreground">Environmental contribution tracker</p>
+        </div>
       </div>
+
+      {/* AI Impact Report CTA / Results */}
+      {hasData && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 overflow-hidden"
+        >
+          {!report && !reportLoading && (
+            <button
+              onClick={fetchReport}
+              className="w-full p-6 flex items-center gap-4 active-press"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center shrink-0">
+                <Sparkles className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1 text-left">
+                <h3 className="text-sm font-semibold text-foreground">Generate AI Impact Report</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Get a personalized sustainability grade, insights, and challenges
+                </p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+            </button>
+          )}
+
+          {reportLoading && (
+            <div className="p-8 flex flex-col items-center gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Analyzing your recycling data...</p>
+            </div>
+          )}
+
+          {report && (
+            <div className="p-5 space-y-4">
+              {/* Header with grade */}
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-base font-bold text-foreground">{report.headline}</h3>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{report.summary}</p>
+                </div>
+                <div className="ml-3 flex flex-col items-center">
+                  <div className={`text-3xl font-black ${GRADE_COLORS[report.grade] || "text-foreground"}`}>
+                    {report.grade}
+                  </div>
+                  <span className="text-[9px] font-mono text-muted-foreground uppercase">Grade</span>
+                </div>
+              </div>
+
+              {/* CO₂ Equivalency */}
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-success/10 border border-success/20">
+                <Leaf className="w-4 h-4 text-success shrink-0" />
+                <p className="text-xs text-foreground">{report.co2Equivalency}</p>
+              </div>
+
+              {/* Strengths & Improvements */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <p className="text-[10px] font-mono text-success uppercase tracking-wider flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" /> Strengths
+                  </p>
+                  {report.strengths.map((s, i) => (
+                    <p key={i} className="text-[11px] text-foreground leading-relaxed">✓ {s}</p>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-mono text-warning uppercase tracking-wider flex items-center gap-1">
+                    <Target className="w-3 h-3" /> Improve
+                  </p>
+                  {report.improvements.map((s, i) => (
+                    <p key={i} className="text-[11px] text-foreground leading-relaxed">→ {s}</p>
+                  ))}
+                </div>
+              </div>
+
+              {/* Fun Stats */}
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-mono text-primary uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> Fun Facts
+                </p>
+                {report.funStats.map((s, i) => (
+                  <p key={i} className="text-[11px] text-muted-foreground leading-relaxed">📊 {s}</p>
+                ))}
+              </div>
+
+              {/* Challenge */}
+              <div className="p-3 rounded-xl bg-warning/10 border border-warning/20">
+                <p className="text-[10px] font-mono text-warning uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Award className="w-3 h-3" /> Weekly Challenge
+                </p>
+                <p className="text-xs text-foreground">{report.challengeOfTheWeek}</p>
+              </div>
+
+              {/* Next Milestone */}
+              <p className="text-xs text-primary font-medium text-center">{report.nextMilestone}</p>
+
+              {/* Refresh */}
+              <button
+                onClick={fetchReport}
+                disabled={reportLoading}
+                className="w-full flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Regenerate report
+              </button>
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {/* Monthly goal */}
       <motion.div
@@ -181,13 +358,7 @@ const ImpactPage = () => {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} unit=" kg" />
               <Tooltip content={<ChartTooltipContent />} />
-              <Area
-                type="monotone"
-                dataKey="co2"
-                stroke="hsl(var(--success))"
-                strokeWidth={2}
-                fill="url(#co2Gradient)"
-              />
+              <Area type="monotone" dataKey="co2" stroke="hsl(var(--success))" strokeWidth={2} fill="url(#co2Gradient)" />
             </AreaChart>
           </ChartContainer>
         ) : (
