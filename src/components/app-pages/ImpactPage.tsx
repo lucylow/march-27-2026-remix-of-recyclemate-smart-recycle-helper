@@ -602,21 +602,51 @@ const ImpactPage = () => {
           <Globe className="w-4 h-4 text-primary" />
           <h3 className="text-sm font-semibold">UN SDG Alignment</h3>
         </div>
-        <div className="space-y-2.5">
-          {SDG_TARGETS.map((sdg) => (
-            <div key={sdg.sdg} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-secondary/40">
-              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary mt-0.5">
-                {sdg.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] text-primary font-medium">{sdg.sdg}</span>
-                  <span className="text-xs font-medium text-foreground">{sdg.label}</span>
+      {/* SDG Alignment — Data-Driven */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18 }}
+        className="p-5 rounded-3xl border border-border bg-card shadow-soft"
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <Globe className="w-4 h-4 text-primary" />
+          <h3 className="text-sm font-semibold">Your SDG Contributions</h3>
+        </div>
+        <p className="text-[11px] text-muted-foreground mb-4">Track your personal progress towards UN Sustainable Development Goals</p>
+        <div className="space-y-3">
+          {getSDGTargets().map((sdg) => {
+            const prog = sdg.progress(totalItems);
+            const metricText = sdg.metric(totalItems, parseFloat(co2Saved), waterSaved);
+            return (
+              <div key={sdg.sdg} className="p-3 rounded-xl bg-secondary/40">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary">
+                    {sdg.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] text-primary font-medium">{sdg.sdg}</span>
+                        <span className="text-xs font-medium text-foreground">{sdg.label}</span>
+                      </div>
+                      <span className="font-mono text-[10px] text-muted-foreground">{prog.toFixed(0)}%</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-snug">{sdg.desc}</p>
+                  </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">{sdg.desc}</p>
+                <div className="h-1.5 bg-background rounded-full overflow-hidden mb-1">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${prog}%` }}
+                    transition={{ duration: 1, ease: [0.19, 1, 0.22, 1] }}
+                    className="h-full bg-primary rounded-full"
+                  />
+                </div>
+                <p className="text-[10px] text-primary font-medium">{metricText}</p>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </motion.div>
 
