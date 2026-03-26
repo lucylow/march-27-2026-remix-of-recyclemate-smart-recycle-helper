@@ -34,46 +34,79 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
   const [aiMode, setAiMode] = useState(true);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(true);
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const viewfinderRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const startCamera = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        try {
-          await videoRef.current.play();
-        } catch (playErr) {
-          console.warn("Auto-play failed, waiting for user interaction:", playErr);
-        }
-        setCameraActive(true);
-        setShowHint(true);
-        setTimeout(() => setShowHint(false), 4000);
-      }
-    } catch {
-      toast.error("Camera access denied. You can still upload images.");
-      setCameraActive(true);
-    }
-  }, []);
-
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+    }
     setCameraActive(false);
+    setIsVideoReady(false);
     setTorchOn(false);
     setPreviewImage(null);
     setDetections([]);
   }, []);
 
+  const startCamera = useCallback(async () => {
+    try {
+      stopCamera();
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      streamRef.current = stream;
+      setPreviewImage(null);
+      setDetections([]);
+      setIsVideoReady(false);
+      setCameraActive(true);
+      setShowHint(true);
+      setTimeout(() => setShowHint(false), 4000);
+    } catch (error) {
+      console.error("Camera startup error:", error);
+      stopCamera();
+      toast.error("Camera access failed. You can still upload images.");
+    }
+  }, [stopCamera]);
+
   useEffect(() => {
     return () => stopCamera();
   }, [stopCamera]);
+
+  useEffect(() => {
+    if (!cameraActive || !streamRef.current || !videoRef.current) return;
+
+    const video = videoRef.current;
+    video.srcObject = streamRef.current;
+
+    const handleReady = async () => {
+      try {
+        await video.play();
+        setIsVideoReady(true);
+      } catch (playErr) {
+        console.warn("Video playback failed:", playErr);
+        toast.error("Camera connected, but preview could not start. Try clicking Enable Camera again.");
+      }
+    };
+
+    video.onloadedmetadata = () => {
+      void handleReady();
+    };
+
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      void handleReady();
+    }
+
+    return () => {
+      video.onloadedmetadata = null;
+    };
+  }, [cameraActive]);
 
   const toggleTorch = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -200,6 +233,15 @@ const ScannerView = ({ onDetection }: ScannerViewProps) => {
                 muted
                 className="absolute inset-0 w-full h-full object-cover"
               />
+            )}
+
+            {!previewImage && streamRef.current && !isVideoReady && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-3 text-center text-white/70">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <p className="text-sm font-medium">Starting camera preview…</p>
+                </div>
+              </div>
             )}
 
             {/* Vignette overlay for depth */}
