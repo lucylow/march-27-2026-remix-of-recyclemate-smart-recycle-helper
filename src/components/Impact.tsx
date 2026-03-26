@@ -1,4 +1,6 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 
 const stats = [
   { value: "2B+", label: "Tons of waste generated annually", source: "World Bank, 2018" },
@@ -7,7 +9,20 @@ const stats = [
   { value: "85%", label: "Unsure how to dispose certain items", source: "RecycleMate Survey" },
 ];
 
+const SDG_GOALS = [
+  { num: 4, name: "Quality Education", color: "hsl(0 68% 53%)", icon: "🎓", alignment: "AI-powered quizzes & micro-learning moments teach sustainable practices after every scan.", direct: true },
+  { num: 6, name: "Clean Water", color: "hsl(38 92% 50%)", icon: "💧", alignment: "Every recycled item saves ~7.6L of water compared to virgin material production.", direct: true },
+  { num: 11, name: "Sustainable Cities", color: "hsl(35 80% 60%)", icon: "🏙️", alignment: "Reduces urban waste contamination, supporting smarter municipal waste management.", direct: true },
+  { num: 12, name: "Responsible Consumption", color: "hsl(33 75% 49%)", icon: "♻️", alignment: "Core mission: AI vision identifies materials and provides correct disposal instructions, reducing contamination by up to 30%.", direct: true, primary: true },
+  { num: 13, name: "Climate Action", color: "hsl(52 70% 48%)", icon: "🌡️", alignment: "Each correctly recycled item avoids ~0.157kg CO₂. Reduced landfill waste means less methane emissions.", direct: true },
+  { num: 14, name: "Life Below Water", color: "hsl(200 70% 50%)", icon: "🐠", alignment: "Preventing plastic from entering oceans — 8M tons of plastic enter oceans yearly. Better sorting = less marine pollution.", direct: false },
+  { num: 15, name: "Life on Land", color: "hsl(120 45% 45%)", icon: "🌳", alignment: "Recycling paper saves trees — every ton recycled saves ~17 trees. Our virtual forest tracks this impact.", direct: true },
+  { num: 17, name: "Partnerships", color: "hsl(19 56% 40%)", icon: "🤝", alignment: "Open platform designed for municipal partnerships, community engagement, and global expansion.", direct: false },
+];
+
 const Impact = () => {
+  const [expandedSdg, setExpandedSdg] = useState<number | null>(null);
+
   return (
     <section id="impact" className="py-24 px-6">
       <div className="max-w-5xl mx-auto">
@@ -37,6 +52,114 @@ const Impact = () => {
             </motion.div>
           ))}
         </div>
+
+        {/* SDG Alignment Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-20"
+        >
+          <div className="text-center mb-10">
+            <span className="text-label text-muted-foreground">United Nations Sustainable Development Goals</span>
+            <h2 className="text-display-xl mt-3">Aligned With<br />Global Goals</h2>
+            <p className="text-muted-foreground mt-4 max-w-lg mx-auto leading-relaxed">
+              RecycleMate directly addresses 6 UN SDGs and indirectly supports 2 more through AI-powered waste sorting, education, and community engagement.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {SDG_GOALS.map((sdg, i) => (
+              <motion.div
+                key={sdg.num}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.06 }}
+                className={`rounded-2xl border overflow-hidden cursor-pointer transition-all duration-200 ${
+                  sdg.primary ? "border-primary/30 ring-2 ring-primary/10" : "border-border"
+                } bg-card hover:shadow-elevated`}
+                onClick={() => setExpandedSdg(expandedSdg === sdg.num ? null : sdg.num)}
+              >
+                <div className="p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
+                      style={{ backgroundColor: `${sdg.color}20` }}
+                    >
+                      {sdg.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-[10px] font-semibold" style={{ color: sdg.color }}>
+                          SDG {sdg.num}
+                        </span>
+                        {sdg.direct && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-success/10 text-success uppercase">Direct</span>
+                        )}
+                        {!sdg.direct && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-muted text-muted-foreground uppercase">Indirect</span>
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold text-foreground truncate">{sdg.name}</p>
+                    </div>
+                    <ChevronDown
+                      className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 ${
+                        expandedSdg === sdg.num ? "rotate-180" : ""
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <AnimatePresence>
+                  {expandedSdg === sdg.num && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-4 pb-4 pt-1 border-t border-border">
+                        <p className="text-xs text-muted-foreground leading-relaxed">{sdg.alignment}</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* SDG 12 highlight */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mt-8 p-6 rounded-3xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl">♻️</span>
+              <div>
+                <span className="font-mono text-xs text-primary font-semibold">PRIMARY ALIGNMENT</span>
+                <h3 className="text-lg font-bold text-foreground">SDG 12.5 — Substantially reduce waste generation</h3>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+              <div className="p-3 rounded-xl bg-background/60 text-center">
+                <p className="font-mono text-2xl font-bold text-primary">30%</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Contamination reduction potential</p>
+              </div>
+              <div className="p-3 rounded-xl bg-background/60 text-center">
+                <p className="font-mono text-2xl font-bold text-success">12.8</p>
+                <p className="text-[11px] text-muted-foreground mt-1">SDG Target: Awareness for sustainable lifestyles</p>
+              </div>
+              <div className="p-3 rounded-xl bg-background/60 text-center">
+                <p className="font-mono text-2xl font-bold text-warning">5</p>
+                <p className="text-[11px] text-muted-foreground mt-1">AI features aligned with SDG targets</p>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
 
         {/* Result Card Demo */}
         <motion.div

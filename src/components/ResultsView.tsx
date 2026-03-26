@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Award, CheckCircle2, Sparkles, Leaf, MessageCircle, Recycle, Skull, Clock, Lightbulb, BarChart3 } from "lucide-react";
+import { ArrowLeft, MapPin, Award, CheckCircle2, Sparkles, Leaf, MessageCircle, Recycle, Clock, Lightbulb, BarChart3, Globe } from "lucide-react";
 import type { DetectedItem } from "@/context/UserContext";
 import { useUser } from "@/context/UserContext";
 import { getDisposalInstructions, type DisposalInstruction } from "@/services/api";
@@ -26,6 +26,41 @@ const CATEGORY_ICONS: Record<string, string> = {
   organic: "🌱", hazardous: "☠️", ewaste: "🔌", textile: "👕", other: "📦",
 };
 
+/** SDG micro-learning facts mapped by material category */
+const SDG_FACTS: Record<string, { sdg: string; fact: string; icon: string }[]> = {
+  plastic: [
+    { sdg: "SDG 14", fact: "8M tons of plastic enter oceans yearly. Recycling this item helps protect marine life.", icon: "🐠" },
+    { sdg: "SDG 13", fact: "Recycling 1 plastic bottle saves enough energy to power a 60W light bulb for 6 hours.", icon: "🌡️" },
+  ],
+  metal: [
+    { sdg: "SDG 12", fact: "Recycling aluminum saves 95% of the energy needed to make new aluminum from raw materials.", icon: "♻️" },
+    { sdg: "SDG 7", fact: "One recycled can saves enough energy to run a TV for 3 hours.", icon: "⚡" },
+  ],
+  paper: [
+    { sdg: "SDG 15", fact: "Every ton of recycled paper saves 17 trees, 7,000 gallons of water, and 3 cubic yards of landfill space.", icon: "🌳" },
+    { sdg: "SDG 6", fact: "Recycling paper uses 70% less water than making paper from virgin wood pulp.", icon: "💧" },
+  ],
+  glass: [
+    { sdg: "SDG 12", fact: "Glass is 100% recyclable and can be recycled endlessly without loss in quality.", icon: "♻️" },
+    { sdg: "SDG 13", fact: "Recycling glass reduces CO₂ emissions — every 6 tons recycled saves 1 ton of CO₂.", icon: "🌡️" },
+  ],
+  organic: [
+    { sdg: "SDG 13", fact: "Composting food waste prevents methane emissions — 25x more potent than CO₂ as a greenhouse gas.", icon: "🌡️" },
+    { sdg: "SDG 15", fact: "Compost enriches soil, reducing need for chemical fertilizers and supporting biodiversity.", icon: "🌳" },
+  ],
+  hazardous: [
+    { sdg: "SDG 6", fact: "One improperly disposed battery can contaminate 600,000 litres of water.", icon: "💧" },
+    { sdg: "SDG 3", fact: "Proper hazardous waste disposal protects communities from toxic exposure and health risks.", icon: "🏥" },
+  ],
+  ewaste: [
+    { sdg: "SDG 12", fact: "Only 17% of e-waste is formally recycled globally. Each device contains valuable recoverable materials.", icon: "♻️" },
+    { sdg: "SDG 8", fact: "The e-waste recycling industry creates green jobs — proper recycling supports decent work.", icon: "💼" },
+  ],
+  other: [
+    { sdg: "SDG 12", fact: "Being unsure about disposal is normal — 85% of people feel the same. You're already making a difference by checking!", icon: "♻️" },
+  ],
+};
+
 const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
   const [instructions, setInstructions] = useState<DisposalInstruction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +71,19 @@ const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
 
   const totalCo2 = detections.reduce((sum, d) => sum + (d.co2SavedGrams || 0), 0);
   const recyclableCount = detections.filter(d => d.recyclable !== false).length;
+
+  // Compute SDG contributions from this scan
+  const sdgContributions = (() => {
+    const contribs: Record<string, number> = {};
+    detections.forEach(d => {
+      const cat = d.category || "other";
+      const facts = SDG_FACTS[cat] || SDG_FACTS.other;
+      facts.forEach(f => {
+        contribs[f.sdg] = (contribs[f.sdg] || 0) + 1;
+      });
+    });
+    return Object.entries(contribs).sort(([, a], [, b]) => b - a).slice(0, 4);
+  })();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -73,6 +121,12 @@ const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
     if (onNavigate) {
       onNavigate("chat", `Tell me more about recycling ${itemName}. What are some creative ways to reuse it?`);
     }
+  };
+
+  /** Get a random SDG fact for a given category */
+  const getRandomFact = (category: string) => {
+    const facts = SDG_FACTS[category] || SDG_FACTS.other;
+    return facts[Math.floor(Math.random() * facts.length)];
   };
 
   return (
@@ -131,6 +185,24 @@ const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
         </motion.div>
       )}
 
+      {/* SDG contribution badges */}
+      {!loading && !error && sdgContributions.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mx-6 mb-3 flex items-center gap-2 flex-wrap"
+        >
+          <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <span className="text-[10px] text-muted-foreground font-mono uppercase">SDGs impacted:</span>
+          {sdgContributions.map(([sdg]) => (
+            <span key={sdg} className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">
+              {sdg}
+            </span>
+          ))}
+        </motion.div>
+      )}
+
       {/* Scrollable results */}
       <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4">
         {loading ? (
@@ -157,6 +229,7 @@ const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
             const style = BIN_STYLES[inst.binColor] || BIN_STYLES.foreground;
             const isExpanded = expandedCard === i;
             const catIcon = CATEGORY_ICONS[det?.category || "other"] || "📦";
+            const sdgFact = getRandomFact(det?.category || "other");
 
             return (
               <motion.div
@@ -225,6 +298,24 @@ const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
                       ) : null}
                     </div>
                   )}
+
+                  {/* 🌍 "Did You Know?" SDG micro-learning */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.12 + 0.5 }}
+                    className="mt-3 p-3 rounded-xl bg-accent/50 border border-accent-foreground/5"
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="text-base shrink-0">{sdgFact.icon}</span>
+                      <div>
+                        <p className="text-[10px] font-mono text-primary font-semibold uppercase tracking-wider mb-0.5">
+                          Did You Know? · {sdgFact.sdg}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">{sdgFact.fact}</p>
+                      </div>
+                    </div>
+                  </motion.div>
 
                   {/* Expandable details */}
                   <button
