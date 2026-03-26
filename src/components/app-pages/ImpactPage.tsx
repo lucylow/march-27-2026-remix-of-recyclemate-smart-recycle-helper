@@ -49,12 +49,23 @@ const GRADE_COLORS: Record<string, string> = {
   D: "text-destructive", F: "text-destructive",
 };
 
-const SDG_TARGETS = [
-  { sdg: "SDG 4.7", label: "Education", icon: <GraduationCap className="w-3.5 h-3.5" />, desc: "Sustainability literacy through quizzes & micro-learning" },
-  { sdg: "SDG 6", label: "Clean Water", icon: <Droplets className="w-3.5 h-3.5" />, desc: "Water saved by recycling materials instead of producing new" },
-  { sdg: "SDG 12.5", label: "Waste Reduction", icon: <Recycle className="w-3.5 h-3.5" />, desc: "Correctly sorted items reduce contamination & landfill" },
-  { sdg: "SDG 13", label: "Climate Action", icon: <Leaf className="w-3.5 h-3.5" />, desc: "CO₂ emissions avoided through proper recycling" },
-  { sdg: "SDG 15", label: "Life on Land", icon: <TreePine className="w-3.5 h-3.5" />, desc: "Trees preserved by recycling paper & cardboard" },
+interface SDGTarget {
+  sdg: string;
+  label: string;
+  icon: React.ReactNode;
+  desc: string;
+  metric: (items: number, co2: number, water: number) => string;
+  progress: (items: number) => number; // 0-100
+}
+
+const getSDGTargets = (): SDGTarget[] => [
+  { sdg: "SDG 4.7", label: "Education", icon: <GraduationCap className="w-3.5 h-3.5" />, desc: "Sustainability literacy through quizzes & micro-learning", metric: (items) => `${items} items learned about`, progress: (items) => Math.min((items / 50) * 100, 100) },
+  { sdg: "SDG 6", label: "Clean Water", icon: <Droplets className="w-3.5 h-3.5" />, desc: "Water saved by recycling materials instead of producing new", metric: (_, __, water) => `${water} L water saved`, progress: (items) => Math.min((items * WATER_PER_ITEM / 500) * 100, 100) },
+  { sdg: "SDG 11", label: "Sustainable Cities", icon: <Globe className="w-3.5 h-3.5" />, desc: "Urban waste contamination reduced through correct sorting", metric: (items) => `${items} items correctly sorted`, progress: (items) => Math.min((items / 100) * 100, 100) },
+  { sdg: "SDG 12.5", label: "Waste Reduction", icon: <Recycle className="w-3.5 h-3.5" />, desc: "Correctly sorted items reduce contamination & landfill", metric: (items) => `${items} items diverted from landfill`, progress: (items) => Math.min((items / 200) * 100, 100) },
+  { sdg: "SDG 13", label: "Climate Action", icon: <Leaf className="w-3.5 h-3.5" />, desc: "CO₂ emissions avoided through proper recycling", metric: (_, co2) => `${co2} kg CO₂ avoided`, progress: (items) => Math.min((items * CO2_PER_ITEM / 10) * 100, 100) },
+  { sdg: "SDG 14", label: "Life Below Water", icon: <Droplets className="w-3.5 h-3.5" />, desc: "Less plastic entering oceans through proper recycling", metric: (items) => `${items} plastic items diverted`, progress: (items) => Math.min((items / 75) * 100, 100) },
+  { sdg: "SDG 15", label: "Life on Land", icon: <TreePine className="w-3.5 h-3.5" />, desc: "Trees preserved by recycling paper & cardboard", metric: (items) => `${(items * TREES_PER_ITEM).toFixed(2)} trees equiv. saved`, progress: (items) => Math.min((items * TREES_PER_ITEM / 1) * 100, 100) },
 ];
 
 // --- Sub-components ---
