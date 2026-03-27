@@ -14,7 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      achievements: {
+        Row: {
+          achievement_key: string
+          id: string
+          unlocked_at: string
+          user_id: string
+        }
+        Insert: {
+          achievement_key: string
+          id?: string
+          unlocked_at?: string
+          user_id: string
+        }
+        Update: {
+          achievement_key?: string
+          id?: string
+          unlocked_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          last_scan_date: string | null
+          points: number
+          region: string | null
+          streak: number
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          last_scan_date?: string | null
+          points?: number
+          region?: string | null
+          streak?: number
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          last_scan_date?: string | null
+          points?: number
+          region?: string | null
+          streak?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      scan_history: {
+        Row: {
+          id: string
+          items: Json
+          points_earned: number
+          scanned_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          items?: Json
+          points_earned?: number
+          scanned_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          items?: Json
+          points_earned?: number
+          scanned_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
