@@ -196,7 +196,7 @@ const ChatPage = () => {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 space-y-4 pb-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-6 space-y-3 sm:space-y-4 pb-3 sm:pb-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 gap-4">
             <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center">

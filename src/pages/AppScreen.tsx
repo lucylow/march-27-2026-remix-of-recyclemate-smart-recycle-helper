@@ -268,7 +268,7 @@ const AppScreen = () => {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.2 }}
-                    className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2"
+                    className="flex-1 flex flex-col overflow-hidden -mx-2 sm:-mx-6 -mt-2"
                   >
                     {page === "history" && <HistoryPage />}
                     {page === "impact" && <ImpactPage />}
