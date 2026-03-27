@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Bell, Moon, MapPin, Smartphone, RotateCcw, Cpu, Zap, Eye, Wrench, Activity } from "lucide-react";
+import { Bell, Moon, MapPin, Smartphone, RotateCcw, Cpu, Zap, Eye, Wrench, Activity, DollarSign } from "lucide-react";
 import { fetchModels, tokenize, type FeatherlessModel } from "@/services/featherless";
+import { Progress } from "@/components/ui/progress";
 
 interface ToggleProps {
   enabled: boolean;
@@ -44,6 +45,14 @@ const SettingsPage = () => {
   const [tokenText, setTokenText] = useState("");
   const [tokenCount, setTokenCount] = useState<number | null>(null);
   const [tokenEstimated, setTokenEstimated] = useState(false);
+  const [tokenLoading, setTokenLoading] = useState(false);
+
+  // Session stats (simulated from localStorage)
+  const [sessionStats, setSessionStats] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("recyclemate_session_stats") || '{"calls": 0, "tokens": 0}');
+    } catch { return { calls: 0, tokens: 0 }; }
+  });
 
   useEffect(() => {
     fetchModels()
@@ -64,9 +73,14 @@ const SettingsPage = () => {
 
   const handleTokenize = async () => {
     if (!tokenText.trim()) return;
-    const result = await tokenize(tokenText, selectedModel || undefined);
-    setTokenCount(result.tokens);
-    setTokenEstimated(result.estimated);
+    setTokenLoading(true);
+    try {
+      const result = await tokenize(tokenText, selectedModel || undefined);
+      setTokenCount(result.tokens);
+      setTokenEstimated(result.estimated);
+    } finally {
+      setTokenLoading(false);
+    }
   };
 
   const handleReset = () => {
@@ -75,6 +89,9 @@ const SettingsPage = () => {
       window.location.reload();
     }
   };
+
+  const estimatedCost = sessionStats.tokens * 0.0001;
+  const budgetUsedPercent = Math.min((estimatedCost / 1000) * 100, 100);
 
   const settings = [
     { icon: <Bell className="w-5 h-5" />, label: "Notifications", desc: "Daily reminders to scan and sort", value: notifications, onChange: setNotifications },
@@ -110,6 +127,36 @@ const SettingsPage = () => {
             <Toggle enabled={setting.value} onChange={setting.onChange} />
           </motion.div>
         ))}
+      </div>
+
+      {/* Token Budget Dashboard */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <DollarSign className="w-4 h-4 text-primary" />
+          <h3 className="text-label text-muted-foreground">AI Budget</h3>
+        </div>
+        <div className="p-4 rounded-2xl border border-border bg-card space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Session Usage</span>
+            <span className="text-xs font-mono text-muted-foreground">
+              ${estimatedCost.toFixed(4)} / $1,000
+            </span>
+          </div>
+          <Progress value={budgetUsedPercent} className="h-2" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-xl bg-secondary/50">
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">API Calls</p>
+              <p className="text-lg font-semibold font-mono">{sessionStats.calls}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-secondary/50">
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Tokens</p>
+              <p className="text-lg font-semibold font-mono">{sessionStats.tokens.toLocaleString()}</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Budget tracking is estimated. Actual costs depend on model and usage.
+          </p>
+        </div>
       </div>
 
       {/* AI Model Selector */}
@@ -196,10 +243,10 @@ const SettingsPage = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={handleTokenize}
-              disabled={!tokenText.trim()}
+              disabled={!tokenText.trim() || tokenLoading}
               className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-medium disabled:opacity-40 active-press"
             >
-              Estimate
+              {tokenLoading ? "…" : "Estimate"}
             </button>
             {tokenCount !== null && (
               <div className="flex items-center gap-2 text-sm">
@@ -209,6 +256,9 @@ const SettingsPage = () => {
                 {tokenEstimated && (
                   <span className="text-[9px] text-muted-foreground/60 font-mono">(est.)</span>
                 )}
+                <span className="text-[9px] text-muted-foreground/60 font-mono">
+                  ~${(tokenCount * 0.0001).toFixed(4)}
+                </span>
               </div>
             )}
           </div>
