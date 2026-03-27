@@ -191,7 +191,7 @@ const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="mx-6 mb-3 flex items-center gap-2 flex-wrap"
+          className="mx-4 sm:mx-6 mb-3 flex items-center gap-1.5 sm:gap-2 flex-wrap"
         >
           <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           <span className="text-[10px] text-muted-foreground font-mono uppercase">SDGs impacted:</span>
