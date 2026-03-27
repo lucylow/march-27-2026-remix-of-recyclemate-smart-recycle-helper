@@ -63,7 +63,7 @@ const OnboardingOverlay = ({ onComplete }: OnboardingOverlayProps) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-8">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 sm:px-8">
         <AnimatePresence mode="wait">
           <motion.div
             key={step}

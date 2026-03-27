@@ -307,7 +307,7 @@ const ChatPage = () => {
       </AnimatePresence>
 
       {/* Input */}
-      <div className="px-6 py-4 border-t border-border bg-background">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-border bg-background">
         <form
           onSubmit={(e) => {
             e.preventDefault();
