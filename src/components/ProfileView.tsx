@@ -56,7 +56,7 @@ const ProfileView = ({ onBack }: ProfileViewProps) => {
         </motion.div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {[
             { icon: <Star className="w-5 h-5 text-primary" />, value: points, label: "Points", color: "text-primary" },
             { icon: <Flame className="w-5 h-5 text-warning" />, value: streak, label: "Streak", color: "text-warning" },
