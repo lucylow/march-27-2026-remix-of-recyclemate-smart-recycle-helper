@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Bell, Moon, MapPin, Smartphone, RotateCcw } from "lucide-react";
+import { Bell, Moon, MapPin, Smartphone, RotateCcw, Cpu, Zap, Eye, Wrench, Activity } from "lucide-react";
+import { fetchModels, tokenize, type FeatherlessModel } from "@/services/featherless";
 
 interface ToggleProps {
   enabled: boolean;
@@ -20,11 +21,53 @@ const Toggle = ({ enabled, onChange }: ToggleProps) => (
   </button>
 );
 
+const TIER_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  fast: { bg: "bg-success/10", text: "text-success", label: "FAST" },
+  heavy: { bg: "bg-warning/10", text: "text-warning", label: "HEAVY" },
+};
+
 const SettingsPage = () => {
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [locationTracking, setLocationTracking] = useState(true);
   const [haptics, setHaptics] = useState(true);
+
+  // AI model state
+  const [models, setModels] = useState<FeatherlessModel[]>([]);
+  const [modelsSource, setModelsSource] = useState("");
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [selectedModel, setSelectedModel] = useState<string>(
+    () => localStorage.getItem("recyclemate_model") || ""
+  );
+
+  // Token estimator
+  const [tokenText, setTokenText] = useState("");
+  const [tokenCount, setTokenCount] = useState<number | null>(null);
+  const [tokenEstimated, setTokenEstimated] = useState(false);
+
+  useEffect(() => {
+    fetchModels()
+      .then(({ models, source }) => {
+        setModels(models);
+        setModelsSource(source);
+        if (!selectedModel && models.length > 0) {
+          setSelectedModel(models[0].id);
+        }
+      })
+      .finally(() => setModelsLoading(false));
+  }, []);
+
+  const handleModelSelect = (id: string) => {
+    setSelectedModel(id);
+    localStorage.setItem("recyclemate_model", id);
+  };
+
+  const handleTokenize = async () => {
+    if (!tokenText.trim()) return;
+    const result = await tokenize(tokenText, selectedModel || undefined);
+    setTokenCount(result.tokens);
+    setTokenEstimated(result.estimated);
+  };
 
   const handleReset = () => {
     if (confirm("Reset all app data? This cannot be undone.")) {
@@ -47,6 +90,7 @@ const SettingsPage = () => {
         <p className="text-sm text-muted-foreground">Customize your experience</p>
       </div>
 
+      {/* General settings */}
       <div className="space-y-2">
         {settings.map((setting, i) => (
           <motion.div
@@ -66,6 +110,112 @@ const SettingsPage = () => {
             <Toggle enabled={setting.value} onChange={setting.onChange} />
           </motion.div>
         ))}
+      </div>
+
+      {/* AI Model Selector */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Cpu className="w-4 h-4 text-primary" />
+          <h3 className="text-label text-muted-foreground">AI Model</h3>
+          {modelsSource && (
+            <span className="text-[10px] font-mono text-muted-foreground/60 px-1.5 py-0.5 rounded bg-secondary">
+              {modelsSource}
+            </span>
+          )}
+        </div>
+
+        {modelsLoading ? (
+          <div className="p-8 text-center">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+            <p className="text-xs text-muted-foreground">Loading models…</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {models.map((model) => {
+              const tier = TIER_STYLES[model.tier] || TIER_STYLES.fast;
+              const isSelected = selectedModel === model.id;
+              return (
+                <motion.button
+                  key={model.id}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={() => handleModelSelect(model.id)}
+                  className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${
+                    isSelected
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-border bg-card hover:border-primary/30"
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    isSelected ? "bg-primary/10" : "bg-secondary"
+                  }`}>
+                    <Cpu className={`w-4 h-4 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{model.name}</p>
+                    <p className="text-[10px] font-mono text-muted-foreground truncate">{model.id}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {model.vision && (
+                      <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-500/10 text-blue-500">
+                        <Eye className="w-2.5 h-2.5" />
+                        VIS
+                      </span>
+                    )}
+                    {model.tools && (
+                      <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-500/10 text-purple-500">
+                        <Wrench className="w-2.5 h-2.5" />
+                        FN
+                      </span>
+                    )}
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${tier.bg} ${tier.text}`}>
+                      {tier.label}
+                    </span>
+                  </div>
+                </motion.button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Token Budget Estimator */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Activity className="w-4 h-4 text-primary" />
+          <h3 className="text-label text-muted-foreground">Token Estimator</h3>
+        </div>
+        <div className="p-4 rounded-2xl border border-border bg-card space-y-3">
+          <textarea
+            value={tokenText}
+            onChange={(e) => setTokenText(e.target.value)}
+            placeholder="Paste a prompt or instruction to estimate tokens…"
+            rows={3}
+            className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleTokenize}
+              disabled={!tokenText.trim()}
+              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-medium disabled:opacity-40 active-press"
+            >
+              Estimate
+            </button>
+            {tokenCount !== null && (
+              <div className="flex items-center gap-2 text-sm">
+                <Zap className="w-4 h-4 text-warning" />
+                <span className="font-mono font-semibold">{tokenCount.toLocaleString()}</span>
+                <span className="text-muted-foreground text-xs">tokens</span>
+                {tokenEstimated && (
+                  <span className="text-[9px] text-muted-foreground/60 font-mono">(est.)</span>
+                )}
+              </div>
+            )}
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Tip: Keep prompts under 2,000 tokens for fast responses. The municipal PDF parser may use up to 4,000.
+          </p>
+        </div>
       </div>
 
       {/* Danger zone */}

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 type Msg = { role: "user" | "assistant"; content: string; image?: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+const AGENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/featherless-agent`;
 
 const SUGGESTIONS = [
   "Can pizza boxes be recycled?",
