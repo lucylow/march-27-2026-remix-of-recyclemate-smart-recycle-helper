@@ -144,10 +144,12 @@ export async function runAI<T = any>(
     skipCache?: boolean;
     model?: string;
     demoMode?: boolean;
+    timeoutMs?: number;
   }
 ): Promise<OrchestratorResult<T>> {
   const start = Date.now();
   const model = options?.model || getModelForTask(task);
+  const timeout = options?.timeoutMs ?? 25000;
 
   // Check cache for deterministic tasks
   const cacheableTasks: AITask[] = ["translation", "impact", "scan_instructions"];
@@ -165,6 +167,22 @@ export async function runAI<T = any>(
         tokensEstimated: 0,
       };
     }
+  }
+
+  // Offline check — return cached or throw
+  if (!isOnline()) {
+    const offlineData = getOfflineCache(`${task}:${cacheInput}`);
+    if (offlineData) {
+      return {
+        data: offlineData as T,
+        task,
+        model,
+        cached: true,
+        durationMs: 0,
+        tokensEstimated: 0,
+      };
+    }
+    throw new Error("You're offline. Please check your connection and try again.");
   }
 
   // Execute task
