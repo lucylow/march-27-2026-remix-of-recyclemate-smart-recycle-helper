@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, Loader2, Sparkles, MessageSquarePlus, ImagePlus, X } from "lucide-react";
+import { Send, Bot, User, Loader2, Sparkles, MessageSquarePlus, ImagePlus, X, Wrench } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useUser } from "@/context/UserContext";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 type Msg = { role: "user" | "assistant"; content: string; image?: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+const AGENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/featherless-agent`;
 
 const SUGGESTIONS = [
   "Can pizza boxes be recycled?",
@@ -26,6 +27,7 @@ const ChatPage = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [agentMode, setAgentMode] = useState(true); // Tool-calling agent mode
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -79,74 +81,105 @@ const ChatPage = () => {
       .flatMap((r) => r.items.map((i) => i.displayName));
 
     try {
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
-          userContext: {
-            points,
-            streak,
-            recentScans,
-            totalScans: scanHistory.length,
+      // Agent mode: tool-calling (non-streaming, but smarter)
+      if (agentMode && !currentImage) {
+        const resp = await fetch(AGENT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          ...(currentImage ? { image: currentImage } : {}),
-        }),
-      });
+          body: JSON.stringify({
+            messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
+            userContext: {
+              points,
+              streak,
+              recentScans,
+              totalScans: scanHistory.length,
+            },
+          }),
+        });
 
-      if (!resp.ok || !resp.body) {
-        const errorData = await resp.json().catch(() => ({}));
-        if (resp.status === 429) toast.error("Rate limited — please wait a moment");
-        else if (resp.status === 402) toast.error("AI credits exhausted");
-        throw new Error(errorData.error || "Failed to connect to AI");
-      }
+        if (!resp.ok) {
+          const errorData = await resp.json().catch(() => ({}));
+          if (resp.status === 429) toast.error("Rate limited — please wait a moment");
+          else if (resp.status === 402) toast.error("AI credits exhausted");
+          throw new Error(errorData.error || "Agent request failed");
+        }
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let streamDone = false;
+        const data = await resp.json();
+        upsertAssistant(data.text || "I wasn't able to process that. Please try again.");
+      } else {
+        // Streaming chat mode (with optional image)
+        const resp = await fetch(CHAT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
+            userContext: {
+              points,
+              streak,
+              recentScans,
+              totalScans: scanHistory.length,
+            },
+            ...(currentImage ? { image: currentImage } : {}),
+          }),
+        });
 
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
+        if (!resp.ok || !resp.body) {
+          const errorData = await resp.json().catch(() => ({}));
+          if (resp.status === 429) toast.error("Rate limited — please wait a moment");
+          else if (resp.status === 402) toast.error("AI credits exhausted");
+          throw new Error(errorData.error || "Failed to connect to AI");
+        }
 
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") { streamDone = true; break; }
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) upsertAssistant(content);
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let textBuffer = "";
+        let streamDone = false;
+
+        while (!streamDone) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          textBuffer += decoder.decode(value, { stream: true });
+
+          let newlineIndex: number;
+          while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+            let line = textBuffer.slice(0, newlineIndex);
+            textBuffer = textBuffer.slice(newlineIndex + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (line.startsWith(":") || line.trim() === "") continue;
+            if (!line.startsWith("data: ")) continue;
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === "[DONE]") { streamDone = true; break; }
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+              if (content) upsertAssistant(content);
+            } catch {
+              textBuffer = line + "\n" + textBuffer;
+              break;
+            }
           }
         }
-      }
 
-      if (textBuffer.trim()) {
-        for (let raw of textBuffer.split("\n")) {
-          if (!raw) continue;
-          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-          if (raw.startsWith(":") || raw.trim() === "") continue;
-          if (!raw.startsWith("data: ")) continue;
-          const jsonStr = raw.slice(6).trim();
-          if (jsonStr === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) upsertAssistant(content);
-          } catch { /* ignore */ }
+        if (textBuffer.trim()) {
+          for (let raw of textBuffer.split("\n")) {
+            if (!raw) continue;
+            if (raw.endsWith("\r")) raw = raw.slice(0, -1);
+            if (raw.startsWith(":") || raw.trim() === "") continue;
+            if (!raw.startsWith("data: ")) continue;
+            const jsonStr = raw.slice(6).trim();
+            if (jsonStr === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+              if (content) upsertAssistant(content);
+            } catch { /* ignore */ }
+          }
         }
       }
     } catch (e) {
@@ -179,20 +212,35 @@ const ChatPage = () => {
         <div>
           <h1 className="text-display mb-1">AI Assistant</h1>
           <p className="text-sm text-muted-foreground">
-            {scanHistory.length > 0
+            {agentMode ? "Agent mode — tool-calling enabled" : (scanHistory.length > 0
               ? `Personalized with ${scanHistory.length} scan${scanHistory.length > 1 ? "s" : ""}`
-              : "Ask anything about recycling & sustainability"}
+              : "Ask anything about recycling & sustainability")}
           </p>
         </div>
-        {messages.length > 0 && (
+        <div className="flex items-center gap-2">
+          {/* Agent mode toggle */}
           <button
-            onClick={handleNewChat}
-            className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center active-press"
-            title="New chat"
+            onClick={() => setAgentMode(!agentMode)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+              agentMode
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "bg-secondary text-muted-foreground"
+            }`}
+            title={agentMode ? "Agent mode: AI can call tools like lookup rules, calculate impact" : "Streaming mode: faster responses with image support"}
           >
-            <MessageSquarePlus className="w-5 h-5 text-muted-foreground" />
+            <Wrench className="w-3.5 h-3.5" />
+            {agentMode ? "Agent" : "Chat"}
           </button>
-        )}
+          {messages.length > 0 && (
+            <button
+              onClick={handleNewChat}
+              className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center active-press"
+              title="New chat"
+            >
+              <MessageSquarePlus className="w-5 h-5 text-muted-foreground" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
