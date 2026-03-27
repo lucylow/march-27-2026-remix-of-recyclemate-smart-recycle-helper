@@ -53,14 +53,18 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [scanHistory, setScanHistory] = useState<ScanRecord[]>([]);
 
   const checkAchievements = useCallback((totalPoints: number) => {
-    const newAchievements: string[] = [];
-    Object.entries(ACHIEVEMENT_THRESHOLDS).forEach(([key, { threshold }]) => {
-      if (totalPoints >= threshold && !achievements.includes(key)) {
-        newAchievements.push(key);
+    try {
+      const newAchievements: string[] = [];
+      Object.entries(ACHIEVEMENT_THRESHOLDS).forEach(([key, { threshold }]) => {
+        if (totalPoints >= threshold && !achievements.includes(key)) {
+          newAchievements.push(key);
+        }
+      });
+      if (newAchievements.length > 0) {
+        setAchievements(prev => [...prev, ...newAchievements]);
       }
-    });
-    if (newAchievements.length > 0) {
-      setAchievements(prev => [...prev, ...newAchievements]);
+    } catch (e) {
+      console.error("Achievement check failed:", e);
     }
   }, [achievements]);
 
