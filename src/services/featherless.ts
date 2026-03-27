@@ -319,18 +319,19 @@ export async function agentChat(
   userContext?: { points?: number; streak?: number; totalScans?: number; recentScans?: string[] },
   model?: string,
 ): Promise<{ text: string }> {
-  const resp = await fetch(AGENT_URL, {
-    method: "POST",
-    headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, userContext, model }),
-  });
-
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error || "Agent request failed");
+  try {
+    const resp = await fetch(AGENT_URL, {
+      method: "POST",
+      headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+      body: JSON.stringify({ messages, userContext, model }),
+    });
+    if (!resp.ok) throw new Error(`Agent API ${resp.status}`);
+    return resp.json();
+  } catch (err) {
+    console.warn("[featherless] Agent API failed, using mock:", err);
+    const lastMsg = messages.filter(m => m.role === "user").pop()?.content || "";
+    return { text: getMockChatResponse(lastMsg) };
   }
-
-  return resp.json();
 }
 
 // ─── Model catalog ───
