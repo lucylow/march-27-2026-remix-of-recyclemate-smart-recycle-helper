@@ -314,7 +314,7 @@ const AppScreen = () => {
       </ErrorBoundary>
 
       {/* Bottom tab bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border px-6 py-3 flex items-center justify-around">
+      <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-around">
         {[
           { id: "scanner" as const, icon: Scan, label: "Scan" },
           { id: "profile" as const, icon: User, label: "Profile" },
