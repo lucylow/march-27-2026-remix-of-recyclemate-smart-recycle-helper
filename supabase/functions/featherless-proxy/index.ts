@@ -76,18 +76,35 @@ serve(async (req) => {
     if (tools) payload.tools = tools;
     if (tool_choice) payload.tool_choice = tool_choice;
 
-    const response = await fetchWithTimeout(
-      FEATHERLESS_URL,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${FEATHERLESS_API_KEY}`,
-          "Content-Type": "application/json",
+    // Retry logic for cold models (503 = insufficient capacity / model loading)
+    let response: Response | null = null;
+    const MAX_RETRIES = 2;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      response = await fetchWithTimeout(
+        FEATHERLESS_URL,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${FEATHERLESS_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      },
-      TIMEOUT_MS,
-    );
+        TIMEOUT_MS,
+      );
+
+      if (response.status === 503 && attempt < MAX_RETRIES) {
+        console.log(`[featherless-proxy] 503 (cold model?), retry ${attempt + 1}/${MAX_RETRIES} in ${2 * (attempt + 1)}s`);
+        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+        continue;
+      }
+      break;
+    }
+
+    if (!response) {
+      return errorResponse("Failed to reach Featherless after retries", 502);
+    }
 
     if (!response.ok) {
       const errBody = await response.text();
