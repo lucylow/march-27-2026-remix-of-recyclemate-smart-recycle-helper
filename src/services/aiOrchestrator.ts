@@ -186,114 +186,114 @@ export async function runAI<T = any>(
   }
 
   // Execute task with retry + timeout
-  const executeTask = async () => {
-  let result: any;
+  const executeTask = async (): Promise<OrchestratorResult<T>> => {
+    let result: any;
 
-  switch (task) {
-    case "vision":
-      result = await visionFallback(payload.image, payload.hint);
-      break;
+    switch (task) {
+      case "vision":
+        result = await visionFallback(payload.image, payload.hint);
+        break;
 
-    case "chat": {
-      const resp = await featherlessChat({
-        messages: payload.messages,
-        model,
-        temperature: payload.temperature ?? 0.3,
-        max_tokens: payload.max_tokens ?? 1024,
-        stream: payload.stream ?? false,
-      });
-      if (payload.stream) {
-        // Return raw response for streaming
-        result = resp;
-      } else {
-        if (!resp.ok) throw new Error("Chat request failed");
-        result = await resp.json();
+      case "chat": {
+        const resp = await featherlessChat({
+          messages: payload.messages,
+          model,
+          temperature: payload.temperature ?? 0.3,
+          max_tokens: payload.max_tokens ?? 1024,
+          stream: payload.stream ?? false,
+        });
+        if (payload.stream) {
+          result = resp;
+        } else {
+          if (!resp.ok) throw new Error("Chat request failed");
+          result = await resp.json();
+        }
+        break;
       }
-      break;
+
+      case "agent":
+        result = await agentChat(payload.messages as AgentMessage[], payload.userContext, model);
+        break;
+
+      case "translation":
+        result = await translateText(payload.text, payload.targetLang);
+        break;
+
+      case "impact":
+        result = await calculateImpactAI(payload.items);
+        break;
+
+      case "scan_instructions": {
+        const resp = await featherlessChat({
+          messages: payload.messages,
+          model,
+          temperature: 0.1,
+          max_tokens: 512,
+        });
+        if (!resp.ok) throw new Error("Scan instruction request failed");
+        result = await resp.json();
+        break;
+      }
+
+      case "daily_nudge": {
+        const resp = await featherlessChat({
+          messages: [
+            { role: "system", content: "Write one encouraging recycling nudge in one sentence. Positive, short, action-oriented." },
+            { role: "user", content: `User stats: ${JSON.stringify(payload.userStats)}` },
+          ],
+          model,
+          temperature: 0.7,
+          max_tokens: 60,
+        });
+        if (!resp.ok) throw new Error("Nudge request failed");
+        result = await resp.json();
+        break;
+      }
+
+      case "rag":
+        result = await agentChat(payload.messages as AgentMessage[], payload.userContext, model);
+        break;
+
+      default:
+        throw new Error(`Unknown AI task: ${task}`);
     }
 
-    case "agent":
-      result = await agentChat(
-        payload.messages as AgentMessage[],
-        payload.userContext,
-        model,
-      );
-      break;
+    const durationMs = Date.now() - start;
+    const tokensEstimated = Math.ceil(cacheInput.length / 4) + 200;
 
-    case "translation":
-      result = await translateText(payload.text, payload.targetLang);
-      break;
-
-    case "impact":
-      result = await calculateImpactAI(payload.items);
-      break;
-
-    case "scan_instructions": {
-      const resp = await featherlessChat({
-        messages: payload.messages,
-        model,
-        temperature: 0.1,
-        max_tokens: 512,
-      });
-      if (!resp.ok) throw new Error("Scan instruction request failed");
-      result = await resp.json();
-      break;
+    // Cache result for offline use
+    if (!options?.skipCache && cacheableTasks.includes(task)) {
+      setCache(task, cacheInput, result);
     }
+    cacheForOffline(`${task}:${cacheInput}`, result);
 
-    case "daily_nudge": {
-      const resp = await featherlessChat({
-        messages: [
-          { role: "system", content: "Write one encouraging recycling nudge in one sentence. Positive, short, action-oriented." },
-          { role: "user", content: `User stats: ${JSON.stringify(payload.userStats)}` },
-        ],
-        model,
-        temperature: 0.7,
-        max_tokens: 60,
-      });
-      if (!resp.ok) throw new Error("Nudge request failed");
-      result = await resp.json();
-      break;
-    }
+    trackAIUsage({
+      task,
+      model,
+      tokensEstimated,
+      durationMs,
+      cached: false,
+      timestamp: Date.now(),
+    });
 
-    case "rag":
-      result = await agentChat(
-        payload.messages as AgentMessage[],
-        payload.userContext,
-        model,
-      );
-      break;
-
-    default:
-      throw new Error(`Unknown AI task: ${task}`);
-  }
-
-  const durationMs = Date.now() - start;
-  const tokensEstimated = Math.ceil(cacheInput.length / 4) + 200; // rough estimate
-
-  // Cache result
-  if (!options?.skipCache && cacheableTasks.includes(task)) {
-    setCache(task, cacheInput, result);
-  }
-
-  // Track usage
-  trackAIUsage({
-    task,
-    model,
-    tokensEstimated,
-    durationMs,
-    cached: false,
-    timestamp: Date.now(),
-  });
-
-  return {
-    data: result as T,
-    task,
-    model,
-    cached: false,
-    durationMs,
-    tokensEstimated,
+    return { data: result as T, task, model, cached: false, durationMs, tokensEstimated };
   };
-}
+
+  // Wrap with retry + timeout (skip for streaming)
+  if (payload.stream) {
+    return executeTask();
+  }
+
+  return withRetry(
+    () => withTimeout(executeTask(), timeout, `AI ${task}`),
+    {
+      maxRetries: 2,
+      retryOn: (err) => {
+        const msg = err?.message || "";
+        return msg.includes("503") || msg.includes("timed out") || msg.includes("Failed to fetch");
+      },
+    },
+  );
 
 /**
  * Intelligent detection cascade:
