@@ -9,6 +9,7 @@
 
 import { featherlessChat, visionFallback, translateText, calculateImpactAI, agentChat, type AgentMessage } from "@/services/featherless";
 import { trackAIUsage, type AIUsageEvent } from "@/services/aiUsageTracker";
+import { withRetry, withTimeout, isOnline, getOfflineCache, cacheForOffline } from "@/services/resilience";
 
 // ─── Task types ───
 
