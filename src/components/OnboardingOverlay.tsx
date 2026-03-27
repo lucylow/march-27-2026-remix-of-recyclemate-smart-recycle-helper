@@ -92,7 +92,7 @@ const OnboardingOverlay = ({ onComplete }: OnboardingOverlayProps) => {
       </div>
 
       {/* Bottom controls */}
-      <div className="px-8 pb-10">
+      <div className="px-6 sm:px-8 pb-[max(2.5rem,env(safe-area-inset-bottom))]">
         {/* Progress dots */}
         <div className="flex items-center justify-center gap-2 mb-8">
           {SLIDES.map((_, i) => (
