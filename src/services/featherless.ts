@@ -238,3 +238,85 @@ export async function smartDetectCascade(
     usedFallback: false,
   };
 }
+
+// ─── Agent (tool-calling) ───
+
+export interface AgentMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/**
+ * Send a message to the RecycleMate agent (tool-calling mode).
+ * The agent can call lookup_local_rules, translate_instruction,
+ * calculate_impact, and get_user_stats autonomously.
+ */
+export async function agentChat(
+  messages: AgentMessage[],
+  userContext?: { points?: number; streak?: number; totalScans?: number; recentScans?: string[] },
+  model?: string,
+): Promise<{ text: string }> {
+  const resp = await fetch(AGENT_URL, {
+    method: "POST",
+    headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, userContext, model }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error || "Agent request failed");
+  }
+
+  return resp.json();
+}
+
+// ─── Model catalog ───
+
+export interface FeatherlessModel {
+  id: string;
+  name: string;
+  tier: "fast" | "heavy";
+  status: string;
+  vision: boolean;
+  tools: boolean;
+}
+
+/**
+ * Fetch available Featherless models.
+ * Returns a curated list even when Featherless API key is not configured.
+ */
+export async function fetchModels(): Promise<{ models: FeatherlessModel[]; source: string }> {
+  try {
+    const resp = await fetch(`${MODELS_URL}?action=list`, {
+      headers: AUTH_HEADER,
+    });
+    if (!resp.ok) throw new Error("Failed to fetch models");
+    return resp.json();
+  } catch {
+    return {
+      models: [
+        { id: "meta-llama/Meta-Llama-3.1-8B-Instruct", name: "Llama 3.1 8B", tier: "fast", status: "available", vision: false, tools: false },
+        { id: "Qwen/Qwen3-8B", name: "Qwen 3 8B", tier: "fast", status: "available", vision: false, tools: true },
+      ],
+      source: "fallback",
+    };
+  }
+}
+
+/**
+ * Tokenize text to estimate token count.
+ * Falls back to a rough char/4 estimate.
+ */
+export async function tokenize(text: string, model?: string): Promise<{ tokens: number; estimated: boolean }> {
+  try {
+    const resp = await fetch(`${MODELS_URL}?action=tokenize`, {
+      method: "POST",
+      headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+      body: JSON.stringify({ text, model }),
+    });
+    if (!resp.ok) throw new Error();
+    return resp.json();
+  } catch {
+    return { tokens: Math.ceil(text.length / 4), estimated: true };
+  }
+}
