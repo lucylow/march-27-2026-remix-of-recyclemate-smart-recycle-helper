@@ -175,7 +175,7 @@ const ChatPage = () => {
       />
 
       {/* Header */}
-      <div className="px-6 pt-6 pb-3 flex items-center justify-between">
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 sm:pb-3 flex items-center justify-between">
         <div>
           <h1 className="text-display mb-1">AI Assistant</h1>
           <p className="text-sm text-muted-foreground">
