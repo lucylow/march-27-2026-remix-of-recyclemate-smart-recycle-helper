@@ -1,7 +1,10 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, Flame, Star, Clock, Trophy, Target } from "lucide-react";
+import { ArrowLeft, Flame, Star, Clock, Trophy, Target, LogOut, LogIn } from "lucide-react";
 import { useUser } from "@/context/UserContext";
+import { useAuth } from "@/context/AuthContext";
 import EcoAvatar from "@/components/EcoAvatar";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface ProfileViewProps {
   onBack: () => void;
