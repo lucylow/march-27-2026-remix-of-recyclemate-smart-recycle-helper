@@ -7,7 +7,53 @@ const corsHeaders = {
 };
 
 const FEATHERLESS_URL = "https://api.featherless.ai/v1/chat/completions";
+const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 2;
+
+// ─── In-memory cache (per isolate lifetime) ───
+const responseCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
+
+function getCacheKey(model: string, messages: any[]): string {
+  // Only cache deterministic requests (low temperature)
+  const key = JSON.stringify({ model, messages: messages.slice(-3) });
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = ((hash << 5) - hash) + key.charCodeAt(i);
+    hash |= 0;
+  }
+  return String(Math.abs(hash));
+}
+
+function getCached(key: string): any | null {
+  const entry = responseCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    responseCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache(key: string, data: any): void {
+  // Prune if too large
+  if (responseCache.size > 200) {
+    const oldest = responseCache.keys().next().value;
+    if (oldest) responseCache.delete(oldest);
+  }
+  responseCache.set(key, { data, timestamp: Date.now() });
+}
+
+// ─── Model routing by task ───
+const TASK_MODELS: Record<string, string> = {
+  vision: "google/gemma-3-27b-it",
+  chat: "meta-llama/Meta-Llama-3.1-8B-Instruct",
+  translation: "Qwen/Qwen2.5-7B-Instruct",
+  impact: "Qwen/Qwen2.5-7B-Instruct",
+  agent: "Qwen/Qwen3-8B",
+  demo: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+};
 
 function errorResponse(message: string, status: number) {
   return new Response(JSON.stringify({ error: message }), {
@@ -38,7 +84,7 @@ serve(async (req) => {
       return errorResponse("Invalid JSON body", 400);
     }
 
-    const { messages, model, temperature, max_tokens, stream, tools, tool_choice } = body;
+    const { messages, model, temperature, max_tokens, stream, tools, tool_choice, task } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return errorResponse("'messages' must be a non-empty array", 400);
@@ -47,76 +93,175 @@ serve(async (req) => {
       return errorResponse("Too many messages. Maximum 50 allowed.", 400);
     }
 
+    // Determine provider and model
     const FEATHERLESS_API_KEY = Deno.env.get("FEATHERLESS_API_KEY");
-    if (!FEATHERLESS_API_KEY) {
-      console.error("[featherless-proxy] FEATHERLESS_API_KEY not configured");
-      return errorResponse(
-        "Featherless.ai not configured. Please add your API key in project settings.",
-        500,
-      );
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+    let providerUrl: string;
+    let providerKey: string;
+
+    if (FEATHERLESS_API_KEY) {
+      providerUrl = FEATHERLESS_URL;
+      providerKey = FEATHERLESS_API_KEY;
+    } else if (LOVABLE_API_KEY) {
+      providerUrl = LOVABLE_GATEWAY;
+      providerKey = LOVABLE_API_KEY;
+    } else {
+      return errorResponse("No AI service configured. Add FEATHERLESS_API_KEY or ensure Lovable AI is enabled.", 500);
+    }
+
+    // Task-based model selection with explicit override support
+    let selectedModel = model;
+    if (!selectedModel && task && TASK_MODELS[task]) {
+      selectedModel = TASK_MODELS[task];
+    }
+    if (!selectedModel) {
+      selectedModel = "meta-llama/Meta-Llama-3.1-8B-Instruct";
+    }
+
+    // If using Lovable AI gateway, override to compatible model
+    if (!FEATHERLESS_API_KEY && LOVABLE_API_KEY) {
+      selectedModel = "google/gemini-3-flash-preview";
+    }
+
+    // Vision auto-detect: switch model for multimodal content
+    const hasVision = messages.some((m: any) =>
+      Array.isArray(m.content) && m.content.some((c: any) => c.type === "image_url")
+    );
+    if (hasVision && !model && FEATHERLESS_API_KEY) {
+      selectedModel = "google/gemma-3-27b-it";
     }
 
     const payload: Record<string, unknown> = {
-      model: model || "meta-llama/Meta-Llama-3.1-8B-Instruct",
+      model: selectedModel,
       messages,
       temperature: temperature ?? 0.3,
       max_tokens: max_tokens ?? 1024,
       stream: stream ?? false,
     };
 
-    // Support vision: if any message has multimodal content (array with image_url),
-    // auto-switch to the vision model per Featherless docs (text first, images after)
-    const hasVision = messages.some((m: any) =>
-      Array.isArray(m.content) && m.content.some((c: any) => c.type === "image_url")
-    );
-    if (hasVision && !model) {
-      payload.model = "google/gemma-3-27b-it";
-    }
-
     if (tools) payload.tools = tools;
     if (tool_choice) payload.tool_choice = tool_choice;
 
-    // Retry logic for cold models (503 = insufficient capacity / model loading)
+    // Cache check for non-streaming, low-temperature requests
+    const isCacheable = !stream && (temperature ?? 0.3) <= 0.2 && !tools;
+    let cacheKey = "";
+    if (isCacheable) {
+      cacheKey = getCacheKey(selectedModel, messages);
+      const cached = getCached(cacheKey);
+      if (cached) {
+        console.log(`[featherless-proxy] Cache HIT in ${Date.now() - start}ms`);
+        return new Response(JSON.stringify({ ...cached, _cached: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Retry logic for cold models (503) and transient errors
     let response: Response | null = null;
-    const MAX_RETRIES = 2;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      response = await fetchWithTimeout(
-        FEATHERLESS_URL,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${FEATHERLESS_API_KEY}`,
-            "Content-Type": "application/json",
+      try {
+        response = await fetchWithTimeout(
+          providerUrl,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${providerKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
           },
-          body: JSON.stringify(payload),
-        },
-        TIMEOUT_MS,
-      );
+          TIMEOUT_MS,
+        );
 
-      if (response.status === 503 && attempt < MAX_RETRIES) {
-        console.log(`[featherless-proxy] 503 (cold model?), retry ${attempt + 1}/${MAX_RETRIES} in ${2 * (attempt + 1)}s`);
-        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
-        continue;
+        if (response.status === 503 && attempt < MAX_RETRIES) {
+          console.log(`[featherless-proxy] 503 (cold model?), retry ${attempt + 1}/${MAX_RETRIES} in ${2 * (attempt + 1)}s`);
+          await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+          continue;
+        }
+        if (response.status >= 500 && attempt < MAX_RETRIES) {
+          console.log(`[featherless-proxy] ${response.status}, retry ${attempt + 1}`);
+          await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+          continue;
+        }
+        break;
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError" && attempt < MAX_RETRIES) {
+          console.log(`[featherless-proxy] Timeout, retry ${attempt + 1}`);
+          continue;
+        }
+        throw e;
       }
-      break;
     }
 
     if (!response) {
-      return errorResponse("Failed to reach Featherless after retries", 502);
+      // If Featherless failed, try Lovable AI as ultimate fallback
+      if (FEATHERLESS_API_KEY && LOVABLE_API_KEY) {
+        console.log("[featherless-proxy] Featherless exhausted, falling back to Lovable AI");
+        payload.model = "google/gemini-3-flash-preview";
+        response = await fetchWithTimeout(
+          LOVABLE_GATEWAY,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          },
+          TIMEOUT_MS,
+        );
+      }
+      if (!response) {
+        return errorResponse("Failed to reach AI provider after retries", 502);
+      }
     }
 
     if (!response.ok) {
       const errBody = await response.text();
       if (response.status === 429)
-        return errorResponse("Featherless rate limit exceeded. Please wait.", 429);
+        return errorResponse("Rate limit exceeded. Please wait a moment.", 429);
+      if (response.status === 402)
+        return errorResponse("AI credits exhausted. Please add funds.", 402);
       if (response.status === 401 || response.status === 403)
-        return errorResponse("Invalid Featherless API key. Check your configuration.", 401);
+        return errorResponse("Invalid API key. Check your configuration.", 401);
       console.error(`[featherless-proxy] ${response.status}:`, errBody.slice(0, 500));
-      return errorResponse("Featherless AI temporarily unavailable.", 502);
+
+      // Cross-provider fallback on error
+      if (FEATHERLESS_API_KEY && LOVABLE_API_KEY && providerUrl === FEATHERLESS_URL) {
+        console.log("[featherless-proxy] Featherless error, trying Lovable AI fallback");
+        payload.model = "google/gemini-3-flash-preview";
+        const fallbackResp = await fetchWithTimeout(
+          LOVABLE_GATEWAY,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          },
+          TIMEOUT_MS,
+        );
+        if (fallbackResp.ok) {
+          console.log(`[featherless-proxy] Lovable AI fallback OK in ${Date.now() - start}ms`);
+          if (stream) {
+            return new Response(fallbackResp.body, {
+              headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+            });
+          }
+          const data = await fallbackResp.json();
+          return new Response(JSON.stringify({ ...data, _fallback: "lovable" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      return errorResponse("AI service temporarily unavailable.", 502);
     }
 
-    console.log(`[featherless-proxy] OK in ${Date.now() - start}ms, stream=${!!stream}`);
+    console.log(`[featherless-proxy] OK in ${Date.now() - start}ms, model=${selectedModel}, stream=${!!stream}, task=${task || "default"}`);
 
     if (stream) {
       return new Response(response.body, {
@@ -125,6 +270,12 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+
+    // Cache the result
+    if (isCacheable && cacheKey) {
+      setCache(cacheKey, data);
+    }
+
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

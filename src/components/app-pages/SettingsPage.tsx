@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Bell, Moon, MapPin, Smartphone, RotateCcw, Cpu, Zap, Eye, Wrench, Activity, DollarSign } from "lucide-react";
+import { Bell, Moon, MapPin, Smartphone, RotateCcw, Cpu, Zap, Eye, Wrench, Activity, DollarSign, BarChart3, Clock } from "lucide-react";
 import { fetchModels, tokenize, type FeatherlessModel } from "@/services/featherless";
+import { getUsageStats, getTodayUsage, clearUsageData, type AIUsageStats } from "@/services/aiUsageTracker";
+import { getModelRouting } from "@/services/aiOrchestrator";
 import { Progress } from "@/components/ui/progress";
 
 interface ToggleProps {
@@ -47,12 +49,10 @@ const SettingsPage = () => {
   const [tokenEstimated, setTokenEstimated] = useState(false);
   const [tokenLoading, setTokenLoading] = useState(false);
 
-  // Session stats (simulated from localStorage)
-  const [sessionStats, setSessionStats] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("recyclemate_session_stats") || '{"calls": 0, "tokens": 0}');
-    } catch { return { calls: 0, tokens: 0 }; }
-  });
+  // Usage stats
+  const [usageStats, setUsageStats] = useState<AIUsageStats | null>(null);
+  const [todayUsage, setTodayUsage] = useState({ calls: 0, tokens: 0, cost: 0 });
+  const [showRouting, setShowRouting] = useState(false);
 
   useEffect(() => {
     fetchModels()
@@ -64,6 +64,9 @@ const SettingsPage = () => {
         }
       })
       .finally(() => setModelsLoading(false));
+
+    setUsageStats(getUsageStats());
+    setTodayUsage(getTodayUsage());
   }, []);
 
   const handleModelSelect = (id: string) => {
@@ -90,8 +93,14 @@ const SettingsPage = () => {
     }
   };
 
-  const estimatedCost = sessionStats.tokens * 0.0001;
-  const budgetUsedPercent = Math.min((estimatedCost / 1000) * 100, 100);
+  const handleClearUsage = () => {
+    clearUsageData();
+    setUsageStats(getUsageStats());
+    setTodayUsage(getTodayUsage());
+  };
+
+  const budgetUsedPercent = usageStats ? Math.min((usageStats.costEstimate / 1000) * 100, 100) : 0;
+  const modelRouting = getModelRouting();
 
   const settings = [
     { icon: <Bell className="w-5 h-5" />, label: "Notifications", desc: "Daily reminders to scan and sort", value: notifications, onChange: setNotifications },
@@ -129,47 +138,128 @@ const SettingsPage = () => {
         ))}
       </div>
 
-      {/* Token Budget Dashboard */}
+      {/* AI Usage Dashboard */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <DollarSign className="w-4 h-4 text-primary" />
-          <h3 className="text-label text-muted-foreground">AI Budget</h3>
+          <BarChart3 className="w-4 h-4 text-primary" />
+          <h3 className="text-label text-muted-foreground">AI Usage Dashboard</h3>
         </div>
-        <div className="p-4 rounded-2xl border border-border bg-card space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Session Usage</span>
-            <span className="text-xs font-mono text-muted-foreground">
-              ${estimatedCost.toFixed(4)} / $1,000
-            </span>
+        <div className="p-4 rounded-2xl border border-border bg-card space-y-4">
+          {/* Budget progress */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-sm font-medium">Sponsor Budget</span>
+              <span className="text-xs font-mono text-muted-foreground">
+                ${usageStats?.costEstimate.toFixed(2) ?? "0.00"} / $1,000
+              </span>
+            </div>
+            <Progress value={budgetUsedPercent} className="h-2" />
           </div>
-          <Progress value={budgetUsedPercent} className="h-2" />
-          <div className="grid grid-cols-2 gap-3">
+
+          {/* Stats grid */}
+          <div className="grid grid-cols-2 gap-2">
             <div className="p-3 rounded-xl bg-secondary/50">
-              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">API Calls</p>
-              <p className="text-lg font-semibold font-mono">{sessionStats.calls}</p>
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Total Calls</p>
+              <p className="text-lg font-semibold font-mono">{usageStats?.totalCalls ?? 0}</p>
             </div>
             <div className="p-3 rounded-xl bg-secondary/50">
-              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Tokens</p>
-              <p className="text-lg font-semibold font-mono">{sessionStats.tokens.toLocaleString()}</p>
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Tokens Used</p>
+              <p className="text-lg font-semibold font-mono">{(usageStats?.totalTokens ?? 0).toLocaleString()}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-secondary/50">
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Cache Hits</p>
+              <p className="text-lg font-semibold font-mono">{usageStats?.cachedCalls ?? 0}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-secondary/50">
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Avg Latency</p>
+              <p className="text-lg font-semibold font-mono">{usageStats?.avgLatencyMs ?? 0}ms</p>
             </div>
           </div>
-          <p className="text-[10px] text-muted-foreground">
-            Budget tracking is estimated. Actual costs depend on model and usage.
-          </p>
+
+          {/* Today's usage */}
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/10">
+            <Clock className="w-4 h-4 text-primary shrink-0" />
+            <div className="flex-1 text-xs">
+              <span className="font-medium">Today:</span>{" "}
+              <span className="font-mono">{todayUsage.calls} calls</span> ·{" "}
+              <span className="font-mono">{todayUsage.tokens.toLocaleString()} tokens</span> ·{" "}
+              <span className="font-mono">${todayUsage.cost.toFixed(4)}</span>
+            </div>
+          </div>
+
+          {/* Task breakdown */}
+          {usageStats && Object.keys(usageStats.callsByTask).length > 0 && (
+            <div>
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-2">Calls by Task</p>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(usageStats.callsByTask)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([task, count]) => (
+                    <span key={task} className="px-2 py-1 rounded-lg bg-secondary text-[10px] font-mono">
+                      {task}: {count}
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={handleClearUsage}
+            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Clear usage data
+          </button>
         </div>
+      </div>
+
+      {/* Model Routing */}
+      <div>
+        <button
+          onClick={() => setShowRouting(!showRouting)}
+          className="flex items-center gap-2 mb-3 w-full"
+        >
+          <Cpu className="w-4 h-4 text-primary" />
+          <h3 className="text-label text-muted-foreground">Model Routing</h3>
+          <span className="ml-auto text-[10px] text-muted-foreground">{showRouting ? "▲" : "▼"}</span>
+        </button>
+        {showRouting && (
+          <div className="space-y-1.5">
+            {Object.entries(modelRouting).map(([task, config]) => (
+              <div key={task} className="flex items-center gap-3 p-2.5 rounded-xl border border-border bg-card">
+                <span className="text-[10px] font-mono font-semibold text-primary uppercase w-20 shrink-0">{task}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-mono text-muted-foreground truncate">{config.featherless}</p>
+                  <p className="text-[9px] text-muted-foreground/60">{config.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* AI Model Selector */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           <Cpu className="w-4 h-4 text-primary" />
-          <h3 className="text-label text-muted-foreground">AI Model</h3>
+          <h3 className="text-label text-muted-foreground">Model Override</h3>
           {modelsSource && (
             <span className="text-[10px] font-mono text-muted-foreground/60 px-1.5 py-0.5 rounded bg-secondary">
               {modelsSource}
             </span>
           )}
         </div>
+
+        {selectedModel && (
+          <button
+            onClick={() => {
+              setSelectedModel("");
+              localStorage.removeItem("recyclemate_model");
+            }}
+            className="mb-2 text-[10px] text-primary hover:underline"
+          >
+            ← Use auto-routing (recommended)
+          </button>
+        )}
 
         {modelsLoading ? (
           <div className="p-8 text-center">
