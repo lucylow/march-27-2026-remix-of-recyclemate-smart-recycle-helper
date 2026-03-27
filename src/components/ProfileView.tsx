@@ -35,6 +35,16 @@ const ProgressBar = ({ value, max, color = "bg-primary" }: { value: number; max:
 const ProfileView = ({ onBack }: ProfileViewProps) => {
   const { points, streak, achievements, scanHistory } = useUser();
   const totalScans = scanHistory.length;
+  const [nudge, setNudge] = useState<string | null>(null);
+
+  useEffect(() => {
+    getDailyNudge({
+      points,
+      streak,
+      totalScans,
+      recentItems: scanHistory.slice(0, 5).flatMap(r => r.items.map(i => i.displayName)),
+    }).then(r => setNudge(r.text)).catch(() => {});
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden">

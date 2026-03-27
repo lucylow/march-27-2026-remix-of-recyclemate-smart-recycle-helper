@@ -1,4 +1,5 @@
 import type { DetectedItem } from "@/context/UserContext";
+import { smartDetectCascade } from "@/services/featherless";
 
 const AI_VISION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-vision`;
 
@@ -44,12 +45,12 @@ export const fileToBase64 = (file: File): Promise<string> => {
 
 /**
  * Run AI vision analysis on a base64 image.
- * Falls back to mock detections if the AI service is unavailable.
+ * Uses a hybrid cascade: primary AI vision → Featherless vision fallback → mock detections.
  */
 export const runInference = async (imageData?: string): Promise<DetectedItem[]> => {
-  // If we have actual image data, try AI vision
   if (imageData) {
     try {
+      // Step 1: Try primary AI vision (Lovable AI)
       const resp = await fetch(AI_VISION_URL, {
         method: "POST",
         headers: {
@@ -62,12 +63,36 @@ export const runInference = async (imageData?: string): Promise<DetectedItem[]> 
       if (resp.ok) {
         const data = await resp.json();
         if (data.detections && data.detections.length > 0) {
-          return data.detections.map((d: any) => ({
+          const primaryResults: DetectedItem[] = data.detections.map((d: any) => ({
             label: d.label,
             displayName: d.displayName,
             confidence: d.confidence,
             bbox: d.bbox as [number, number, number, number],
+            recyclable: d.recyclable,
+            category: d.category,
+            materialDetail: d.materialDetail,
+            co2SavedGrams: d.co2SavedGrams,
+            decompositionYears: d.decompositionYears,
+            funFact: d.funFact,
           }));
+
+          // Step 2: Smart cascade — if confidence is low, try Featherless vision fallback
+          const cascadeResult = await smartDetectCascade(primaryResults, imageData, 0.72);
+
+          if (cascadeResult.usedFallback) {
+            console.log("[tflite] Used Featherless vision fallback for low-confidence items");
+            return cascadeResult.detections.map(d => ({
+              label: d.label,
+              displayName: d.displayName,
+              confidence: d.confidence,
+              bbox: d.bbox,
+              recyclable: d.recyclable,
+              category: d.category,
+              materialDetail: d.materialDetail,
+            }));
+          }
+
+          return primaryResults;
         }
       }
 
@@ -78,16 +103,34 @@ export const runInference = async (imageData?: string): Promise<DetectedItem[]> 
         throw new Error("AI credits exhausted. Using offline detection.");
       }
 
-      console.warn("AI vision returned no detections, using fallback");
+      // Step 3: Primary returned nothing — try Featherless vision as standalone fallback
+      console.warn("Primary AI vision returned no detections, trying Featherless fallback");
+      try {
+        const cascadeResult = await smartDetectCascade([], imageData, 0.72);
+        if (cascadeResult.detections.length > 0) {
+          console.log("[tflite] Featherless standalone fallback detected items");
+          return cascadeResult.detections.map(d => ({
+            label: d.label,
+            displayName: d.displayName,
+            confidence: d.confidence,
+            bbox: d.bbox,
+            recyclable: d.recyclable,
+            category: d.category,
+            materialDetail: d.materialDetail,
+          }));
+        }
+      } catch (cascadeErr) {
+        console.warn("Featherless fallback also failed:", cascadeErr);
+      }
     } catch (e: any) {
       if (e.message?.includes("Rate limited") || e.message?.includes("credits")) {
-        throw e; // Re-throw user-facing errors
+        throw e;
       }
-      console.warn("AI vision unavailable, using fallback:", e);
+      console.warn("AI vision unavailable, using mock fallback:", e);
     }
   }
 
-  // Fallback: simulated detection
+  // Final fallback: simulated detection
   await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 600));
   const result = MOCK_DETECTIONS[mockIndex % MOCK_DETECTIONS.length];
   mockIndex++;
