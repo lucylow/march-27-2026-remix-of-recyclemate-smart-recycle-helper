@@ -185,7 +185,8 @@ export async function runAI<T = any>(
     throw new Error("You're offline. Please check your connection and try again.");
   }
 
-  // Execute task
+  // Execute task with retry + timeout
+  const executeTask = async () => {
   let result: any;
 
   switch (task) {
