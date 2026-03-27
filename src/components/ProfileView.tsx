@@ -34,8 +34,16 @@ const ProgressBar = ({ value, max, color = "bg-primary" }: { value: number; max:
 };
 
 const ProfileView = ({ onBack }: ProfileViewProps) => {
-  const { points, streak, achievements, scanHistory } = useUser();
+  const { points, streak, achievements, scanHistory, displayName } = useUser();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const totalScans = scanHistory.length;
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Signed out");
+    navigate("/");
+  };
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden">
