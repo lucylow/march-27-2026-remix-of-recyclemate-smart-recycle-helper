@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 const CTASection = () => {
+  const navigate = useNavigate();
   return (
     <section className="py-24 px-6 bg-secondary/50">
       <div className="max-w-3xl mx-auto text-center">
@@ -18,11 +20,11 @@ const CTASection = () => {
             Be part of the solution to the 2 billion ton waste crisis.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-4 bg-primary text-primary-foreground rounded-2xl font-medium text-base active-press shadow-soft">
-              Get Early Access
+            <button onClick={() => navigate("/auth")} className="px-8 py-4 bg-primary text-primary-foreground rounded-2xl font-medium text-base active-press shadow-soft">
+              Get Started Free
             </button>
-            <button className="px-8 py-4 bg-foreground text-background rounded-2xl font-medium text-base active-press">
-              Read the Research
+            <button onClick={() => navigate("/app")} className="px-8 py-4 bg-foreground text-background rounded-2xl font-medium text-base active-press">
+              Try as Guest
             </button>
           </div>
         </motion.div>
