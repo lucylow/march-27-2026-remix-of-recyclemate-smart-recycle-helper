@@ -67,7 +67,7 @@ const ProfileView = ({ onBack }: ProfileViewProps) => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="p-4 rounded-2xl border border-border bg-card shadow-soft text-center"
+              className="p-3 sm:p-4 rounded-2xl border border-border bg-card shadow-soft text-center"
             >
               <div className="mx-auto mb-2">{stat.icon}</div>
               <p className={`font-mono text-2xl font-semibold tracking-tighter ${stat.color}`}>{stat.value}</p>
