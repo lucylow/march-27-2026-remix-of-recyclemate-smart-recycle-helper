@@ -58,6 +58,17 @@ const ProfileView = ({ onBack }: ProfileViewProps) => {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-4 sm:pb-6 space-y-4 sm:space-y-6">
+        {/* Daily AI Nudge */}
+        {nudge && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-3 rounded-2xl bg-primary/10 border border-primary/20 flex items-center gap-3"
+          >
+            <Sparkles className="w-5 h-5 text-primary shrink-0" />
+            <p className="text-sm text-foreground font-medium">{nudge}</p>
+          </motion.div>
+        )}
         {/* Eco Avatar */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
