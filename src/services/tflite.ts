@@ -1,5 +1,6 @@
 import type { DetectedItem } from "@/context/UserContext";
 import { smartDetectCascade } from "@/services/featherless";
+import { validateImageInput, withTimeout } from "@/services/resilience";
 
 const AI_VISION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-vision`;
 
@@ -49,16 +50,26 @@ export const fileToBase64 = (file: File): Promise<string> => {
  */
 export const runInference = async (imageData?: string): Promise<DetectedItem[]> => {
   if (imageData) {
+    // Validate image input
+    const validation = validateImageInput(imageData);
+    if (!validation.valid) {
+      console.warn("[tflite] Invalid image input:", validation.error);
+      // Fall through to mock detections
+    } else {
     try {
-      // Step 1: Try primary AI vision (Lovable AI)
-      const resp = await fetch(AI_VISION_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ image: imageData }),
-      });
+      // Step 1: Try primary AI vision (Lovable AI) with timeout
+      const resp = await withTimeout(
+        fetch(AI_VISION_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ image: imageData }),
+        }),
+        20000,
+        "AI Vision",
+      );
 
       if (resp.ok) {
         const data = await resp.json();
@@ -128,6 +139,7 @@ export const runInference = async (imageData?: string): Promise<DetectedItem[]> 
       }
       console.warn("AI vision unavailable, using mock fallback:", e);
     }
+    } // close validation else
   }
 
   // Final fallback: simulated detection
