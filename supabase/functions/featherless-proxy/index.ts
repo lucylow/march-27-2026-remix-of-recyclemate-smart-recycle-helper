@@ -57,12 +57,21 @@ serve(async (req) => {
     }
 
     const payload: Record<string, unknown> = {
-      model: model || "accounts/fireworks/models/llama-v3p1-8b-instruct",
+      model: model || "meta-llama/Meta-Llama-3.1-8B-Instruct",
       messages,
       temperature: temperature ?? 0.3,
       max_tokens: max_tokens ?? 1024,
       stream: stream ?? false,
     };
+
+    // Support vision: if any message has multimodal content (array with image_url),
+    // auto-switch to the vision model per Featherless docs (text first, images after)
+    const hasVision = messages.some((m: any) =>
+      Array.isArray(m.content) && m.content.some((c: any) => c.type === "image_url")
+    );
+    if (hasVision && !model) {
+      payload.model = "google/gemma-3-27b-it";
+    }
 
     if (tools) payload.tools = tools;
     if (tool_choice) payload.tool_choice = tool_choice;
