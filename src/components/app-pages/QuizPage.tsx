@@ -120,7 +120,7 @@ const QuizPage = () => {
   if (finished) {
     const pct = Math.round((score / questions.length) * 100);
     return (
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center text-center gap-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center justify-center text-center gap-4 sm:gap-6">
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 20 }}>
           <div className="w-24 h-24 rounded-3xl bg-primary/10 flex items-center justify-center mb-4 mx-auto">
             <Trophy className="w-12 h-12 text-primary" />
