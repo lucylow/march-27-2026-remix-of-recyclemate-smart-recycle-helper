@@ -157,7 +157,7 @@ const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="mx-6 mb-3 p-3 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-around"
+          className="mx-4 sm:mx-6 mb-3 p-2.5 sm:p-3 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-around gap-1"
         >
           <div className="flex items-center gap-1.5">
             <Recycle className="w-4 h-4 text-primary" />
@@ -191,7 +191,7 @@ const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="mx-6 mb-3 flex items-center gap-2 flex-wrap"
+          className="mx-4 sm:mx-6 mb-3 flex items-center gap-1.5 sm:gap-2 flex-wrap"
         >
           <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           <span className="text-[10px] text-muted-foreground font-mono uppercase">SDGs impacted:</span>
@@ -204,7 +204,7 @@ const ResultsView = ({ detections, onBack, onNavigate }: ResultsViewProps) => {
       )}
 
       {/* Scrollable results */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-6 space-y-4">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />

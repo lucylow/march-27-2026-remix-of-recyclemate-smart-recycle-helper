@@ -107,7 +107,7 @@ const AppScreen = () => {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 400, damping: 35 }}
-              className="absolute left-0 top-0 bottom-0 z-50 w-72 bg-background border-r border-border flex flex-col shadow-elevated"
+              className="absolute left-0 top-0 bottom-0 z-50 w-[min(18rem,85vw)] bg-background border-r border-border flex flex-col shadow-elevated"
             >
               {/* Drawer header */}
               <div className="p-6 bg-primary rounded-br-3xl">
@@ -252,7 +252,7 @@ const AppScreen = () => {
 
       {/* Content */}
       <ErrorBoundary fallbackMessage="This section encountered an error. Try navigating back or refreshing.">
-        <div className="flex-1 flex flex-col px-4 pb-20 overflow-hidden">
+        <div className="flex-1 flex flex-col px-3 sm:px-4 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] overflow-hidden">
           <AnimatePresence mode="wait">
             {view === "scanner" && <ScannerView key="scanner" onDetection={handleDetection} />}
             {view === "results" && (
@@ -314,7 +314,7 @@ const AppScreen = () => {
       </ErrorBoundary>
 
       {/* Bottom tab bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border px-6 py-3 flex items-center justify-around">
+      <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-around">
         {[
           { id: "scanner" as const, icon: Scan, label: "Scan" },
           { id: "profile" as const, icon: User, label: "Profile" },

@@ -97,6 +97,8 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Geist Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-overflow-scrolling: touch;
   }
   .font-mono {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
