@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Flame, Star, Clock, Trophy, Target } from "lucide-react";
+import { ArrowLeft, Flame, Star, Clock, Trophy, Target, Sparkles } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import EcoAvatar from "@/components/EcoAvatar";
+import { getDailyNudge } from "@/services/featherless";
 
 interface ProfileViewProps {
   onBack: () => void;
