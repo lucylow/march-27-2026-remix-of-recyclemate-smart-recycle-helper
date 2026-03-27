@@ -8,6 +8,8 @@ const PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/featherless
 const TRANSLATE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/featherless-translate`;
 const VISION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/featherless-vision`;
 const NUDGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/daily-nudge`;
+const AGENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/featherless-agent`;
+const MODELS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/featherless-models`;
 const AUTH_HEADER = { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` };
 
 export const SUPPORTED_LANGUAGES: Record<string, string> = {
