@@ -231,15 +231,16 @@ const ChatPage = () => {
             <Wrench className="w-3.5 h-3.5" />
             {agentMode ? "Agent" : "Chat"}
           </button>
-        {messages.length > 0 && (
-          <button
-            onClick={handleNewChat}
-            className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center active-press"
-            title="New chat"
-          >
-            <MessageSquarePlus className="w-5 h-5 text-muted-foreground" />
-          </button>
-        )}
+          {messages.length > 0 && (
+            <button
+              onClick={handleNewChat}
+              className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center active-press"
+              title="New chat"
+            >
+              <MessageSquarePlus className="w-5 h-5 text-muted-foreground" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
