@@ -227,13 +227,12 @@ export async function getDailyNudge(userStats: {
       headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
       body: JSON.stringify({ userStats }),
     });
-
     if (!resp.ok) throw new Error("Nudge request failed");
     return resp.json();
   } catch {
     return {
-      text: "Every item you recycle makes a difference! Keep going! ♻️",
-      provider: "static",
+      text: MOCK_NUDGES[Math.floor(Math.random() * MOCK_NUDGES.length)],
+      provider: "mock",
     };
   }
 }
