@@ -259,54 +259,39 @@ const AppScreen = () => {
               <ResultsView key="results" detections={detections} onBack={() => setView("scanner")} onNavigate={(page) => setView(page as AppView)} />
             )}
             {view === "profile" && <ProfileView key="profile" onBack={() => setView("scanner")} />}
-            {view === "history" && (
-              <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-                <HistoryPage />
-              </motion.div>
-            )}
-            {view === "impact" && (
-              <motion.div key="impact" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-                <ImpactPage />
-              </motion.div>
-            )}
-            {view === "settings" && (
-              <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-                <SettingsPage />
-              </motion.div>
-            )}
-            {view === "help" && (
-              <motion.div key="help" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-                <HelpPage />
-              </motion.div>
-            )}
-            {view === "about" && (
-              <motion.div key="about" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-                <AboutPage />
-              </motion.div>
-            )}
-            {view === "quiz" && (
-              <motion.div key="quiz" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-                <QuizPage />
-              </motion.div>
-            )}
-            {view === "community" && (
-              <motion.div key="community" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-                <CommunityPage />
-              </motion.div>
-            )}
-            {view === "challenges" && (
-              <motion.div key="challenges" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-                <ChallengesPage />
-              </motion.div>
+            {["history", "impact", "settings", "help", "about", "quiz", "community", "challenges", "tips"].map(
+              (page) =>
+                view === page && (
+                  <motion.div
+                    key={page}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2"
+                  >
+                    {page === "history" && <HistoryPage />}
+                    {page === "impact" && <ImpactPage />}
+                    {page === "settings" && <SettingsPage />}
+                    {page === "help" && <HelpPage />}
+                    {page === "about" && <AboutPage />}
+                    {page === "quiz" && <QuizPage />}
+                    {page === "community" && <CommunityPage />}
+                    {page === "challenges" && <ChallengesPage />}
+                    {page === "tips" && <TipsPage />}
+                  </motion.div>
+                )
             )}
             {view === "chat" && (
-              <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden">
+              <motion.div
+                key="chat"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.2 }}
+                className="flex-1 flex flex-col overflow-hidden"
+              >
                 <ChatPage />
-              </motion.div>
-            )}
-            {view === "tips" && (
-              <motion.div key="tips" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden -mx-6 -mt-2">
-                <TipsPage />
               </motion.div>
             )}
           </AnimatePresence>
