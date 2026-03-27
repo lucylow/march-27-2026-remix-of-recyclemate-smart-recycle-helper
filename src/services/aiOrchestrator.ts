@@ -297,6 +297,7 @@ export async function runAI<T = any>(
 }
 
 
+/**
  * Intelligent detection cascade:
  * 1. On-device TFLite (fast path)
  * 2. Featherless Vision (unknown items)
