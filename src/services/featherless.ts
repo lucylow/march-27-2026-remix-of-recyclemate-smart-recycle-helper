@@ -40,8 +40,43 @@ export interface VisionResult {
   provider: "featherless" | "lovable";
 }
 
+// ─── Mock data for offline / API failure fallback ───
+
+const MOCK_RECYCLING_RULES: Record<string, { recyclable: boolean; bin: string; instruction: string; category: string }> = {
+  "pizza box": { recyclable: true, bin: "Blue Bin", instruction: "Remove food residue. Flatten the box. If heavily greased, compost instead.", category: "paper" },
+  "plastic bottle": { recyclable: true, bin: "Blue Bin", instruction: "Rinse, remove cap, and place in recycling.", category: "plastic" },
+  "aluminum can": { recyclable: true, bin: "Blue Bin", instruction: "Rinse and place in recycling. No need to crush.", category: "metal" },
+  "glass bottle": { recyclable: true, bin: "Blue Bin", instruction: "Rinse and place in recycling. Remove caps.", category: "glass" },
+  "banana peel": { recyclable: false, bin: "Green Bin", instruction: "Place in compost/organics bin.", category: "organic" },
+  "styrofoam": { recyclable: false, bin: "Garbage", instruction: "Styrofoam is not recyclable in most municipalities. Place in garbage.", category: "plastic" },
+  "cardboard": { recyclable: true, bin: "Blue Bin", instruction: "Flatten and place in recycling. Remove tape if possible.", category: "paper" },
+  "newspaper": { recyclable: true, bin: "Blue Bin", instruction: "Bundle or place loosely in recycling bin.", category: "paper" },
+  "coffee cup": { recyclable: false, bin: "Garbage", instruction: "Most coffee cups have a plastic lining and cannot be recycled. Lid may be recyclable.", category: "mixed" },
+  "battery": { recyclable: false, bin: "Hazardous Waste", instruction: "Take to a household hazardous waste depot. Never put in regular garbage.", category: "hazardous" },
+  "plastic bag": { recyclable: false, bin: "Garbage", instruction: "Return to store drop-off bins. Do not put in curbside recycling.", category: "plastic" },
+  "food scraps": { recyclable: false, bin: "Green Bin", instruction: "Place in compost/organics bin.", category: "organic" },
+};
+
+const MOCK_NUDGES = [
+  "Every item you recycle makes a difference! Keep going! ♻️",
+  "🔥 You're on a roll! Keep that streak alive today!",
+  "🌍 Did you know? Recycling one aluminum can saves enough energy to power a TV for 3 hours!",
+  "🌱 Small actions, big impact. You're making the planet greener one scan at a time!",
+  "💪 Top recyclers scan at least 3 items daily. Can you beat that today?",
+];
+
+function getMockChatResponse(query: string): string {
+  const q = query.toLowerCase();
+  for (const [item, rules] of Object.entries(MOCK_RECYCLING_RULES)) {
+    if (q.includes(item)) {
+      return `${rules.recyclable ? "Yes" : "No"}, ${item} goes in the **${rules.bin}**. ${rules.instruction}`;
+    }
+  }
+  return "I'm currently offline, but here's a tip: when in doubt, check your local municipality's recycling guide for the most accurate sorting instructions. Common recyclables include clean paper, cardboard, metal cans, and plastic bottles (types 1 & 2). ♻️";
+}
+
 /**
- * General-purpose Featherless chat completion
+ * General-purpose Featherless chat completion with mock fallback
  */
 export async function featherlessChat(opts: {
   messages: Array<{ role: string; content: string }>;
@@ -50,17 +85,29 @@ export async function featherlessChat(opts: {
   max_tokens?: number;
   stream?: boolean;
 }): Promise<Response> {
-  return fetch(PROXY_URL, {
-    method: "POST",
-    headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messages: opts.messages,
-      model: opts.model,
-      temperature: opts.temperature,
-      max_tokens: opts.max_tokens,
-      stream: opts.stream ?? false,
-    }),
-  });
+  try {
+    const resp = await fetch(PROXY_URL, {
+      method: "POST",
+      headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: opts.messages,
+        model: opts.model,
+        temperature: opts.temperature,
+        max_tokens: opts.max_tokens,
+        stream: opts.stream ?? false,
+      }),
+    });
+    if (resp.ok) return resp;
+    throw new Error(`API ${resp.status}`);
+  } catch (err) {
+    console.warn("[featherless] Chat API failed, using mock fallback:", err);
+    const lastUserMsg = opts.messages.filter(m => m.role === "user").pop()?.content || "";
+    const mockContent = getMockChatResponse(lastUserMsg);
+    return new Response(JSON.stringify({
+      choices: [{ message: { content: mockContent, role: "assistant" } }],
+      _mock: true,
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
 }
 
 /**
