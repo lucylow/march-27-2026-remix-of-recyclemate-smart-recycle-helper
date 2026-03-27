@@ -212,11 +212,25 @@ const ChatPage = () => {
         <div>
           <h1 className="text-display mb-1">AI Assistant</h1>
           <p className="text-sm text-muted-foreground">
-            {scanHistory.length > 0
+            {agentMode ? "Agent mode — tool-calling enabled" : (scanHistory.length > 0
               ? `Personalized with ${scanHistory.length} scan${scanHistory.length > 1 ? "s" : ""}`
-              : "Ask anything about recycling & sustainability"}
+              : "Ask anything about recycling & sustainability")}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          {/* Agent mode toggle */}
+          <button
+            onClick={() => setAgentMode(!agentMode)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+              agentMode
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "bg-secondary text-muted-foreground"
+            }`}
+            title={agentMode ? "Agent mode: AI can call tools like lookup rules, calculate impact" : "Streaming mode: faster responses with image support"}
+          >
+            <Wrench className="w-3.5 h-3.5" />
+            {agentMode ? "Agent" : "Chat"}
+          </button>
         {messages.length > 0 && (
           <button
             onClick={handleNewChat}
