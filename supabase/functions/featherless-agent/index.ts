@@ -344,13 +344,18 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const start = Date.now();
+  let apiMessages: any[] = [];
+  let providerUrl = "";
+  let demoMode = false;
+
   try {
     let body: any;
     try { body = await req.json(); } catch {
       return errorResponse("Invalid JSON body", 400);
     }
 
-    const { messages, userContext, model, demoMode } = body;
+    const { messages, userContext, model, demoMode: dm } = body;
+    demoMode = !!dm;
     if (!Array.isArray(messages) || messages.length === 0) {
       return errorResponse("'messages' must be a non-empty array", 400);
     }
@@ -376,7 +381,7 @@ IMPORTANT RULES:
 
 ${userContext ? `User context: Points=${userContext.points ?? 0}, Streak=${userContext.streak ?? 0}, Scans=${userContext.totalScans ?? 0}` : ""}`;
 
-    const apiMessages = [
+    apiMessages = [
       { role: "system", content: systemPrompt },
       ...messages.map((m: any) => ({ role: m.role, content: m.content })),
     ];
@@ -385,7 +390,6 @@ ${userContext ? `User context: Points=${userContext.points ?? 0}, Streak=${userC
     const FEATHERLESS_API_KEY = Deno.env.get("FEATHERLESS_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    let providerUrl: string;
     let providerKey: string;
     let providerModel: string;
 
@@ -476,12 +480,39 @@ ${userContext ? `User context: Points=${userContext.points ?? 0}, Streak=${userC
     if (e instanceof DOMException && e.name === "AbortError") {
       return errorResponse("Agent request timed out.", 504);
     }
-    if (e.status === 429) {
-      return errorResponse(e.message, 429);
+
+    // On 429 (rate limit) or 402 from Featherless, try Lovable AI as fallback
+    if ((e.status === 429 || e.status === 402) && providerUrl === FEATHERLESS_URL) {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (LOVABLE_API_KEY) {
+        console.log(`[featherless-agent] Featherless ${e.status}, falling back to Lovable AI`);
+        try {
+          const fallbackData = await callProvider(
+            apiMessages,
+            [],
+            LOVABLE_API_KEY,
+            LOVABLE_GATEWAY,
+            "google/gemini-3-flash-preview",
+            1,
+          );
+          const fallbackContent = fallbackData.choices?.[0]?.message?.content || "I'm experiencing high demand. Please try again shortly.";
+          console.log(`[featherless-agent] Lovable fallback OK in ${Date.now() - start}ms`);
+          return new Response(JSON.stringify({
+            text: fallbackContent,
+            toolsUsed: [],
+            demoMode: !!demoMode,
+            fallback: true,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (fallbackErr) {
+          console.error(`[featherless-agent] Lovable fallback also failed:`, fallbackErr);
+        }
+      }
     }
-    if (e.status === 402) {
-      return errorResponse(e.message, 402);
-    }
+
+    if (e.status === 429) return errorResponse(e.message, 429);
+    if (e.status === 402) return errorResponse(e.message, 402);
     console.error(`[featherless-agent] Error after ${Date.now() - start}ms:`, e);
     return errorResponse(e instanceof Error ? e.message : "Agent error", 500);
   }
